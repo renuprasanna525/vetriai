@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import "./AIChat.css";
 
 const API_BASE_URL =
-  "https://vetri-ai-backend-9maw.onrender.com/api";
+  "https://vetri-ai-backend-i3pw.onrender.com/api";
 
 const AI_BOT_IMAGE = "/ai-bot.gif";
 
@@ -421,8 +421,8 @@ function AIChat() {
             <div
               key={index}
               className={`ai-message-row ${message.sender === "user"
-                  ? "user-message-row"
-                  : "ai-message-row-left"
+                ? "user-message-row"
+                : "ai-message-row-left"
                 }`}
             >
 
@@ -452,8 +452,8 @@ function AIChat() {
 
               <div
                 className={`ai-message ${message.sender === "user"
-                    ? "user-message"
-                    : "assistant-message"
+                  ? "user-message"
+                  : "assistant-message"
                   }`}
               >
 

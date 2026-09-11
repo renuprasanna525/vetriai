@@ -1,5 +1,5 @@
 const API_BASE_URL =
-    "https://vetri-ai-backend-9maw.onrender.com/api/notifications";
+    "https://vetri-ai-backend-i3pw.onrender.com/api/notifications";
 
 
 export async function getNotifications(accessToken) {
