@@ -1,19 +1,16 @@
-const API_BASE_URL = 'http://127.0.0.1:8000/api';
+import { authFetch } from "./authFetch";
+
+const API_BASE_URL =
+    "https://vetri-ai-backend-i3pw.onrender.com/api";
+
 
 export async function getUserRoles() {
-    const accessToken = localStorage.getItem('access_token');
-
-    if (!accessToken) {
-        throw new Error('You are not logged in.');
-    }
-
-    const response = await fetch(
+    const response = await authFetch(
         `${API_BASE_URL}/user-roles/`,
         {
-            method: 'GET',
+            method: "GET",
             headers: {
-                Authorization: `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
+                "Content-Type": "application/json",
             },
         }
     );
@@ -22,7 +19,7 @@ export async function getUserRoles() {
 
     if (!response.ok) {
         throw new Error(
-            data.detail || 'Failed to load user roles'
+            data.detail || "Failed to load user roles"
         );
     }
 

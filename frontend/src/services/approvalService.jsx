@@ -1,19 +1,7 @@
+import { authFetch } from "./authFetch";
+
 const API_BASE_URL =
     "https://vetri-ai-backend-i3pw.onrender.com/api/approvals";
-
-
-function getAuthHeaders() {
-    const accessToken = localStorage.getItem("access_token");
-
-    if (!accessToken) {
-        throw new Error("You are not logged in.");
-    }
-
-    return {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-    };
-}
 
 
 export async function createApprovalPreview({
@@ -22,11 +10,13 @@ export async function createApprovalPreview({
     action,
     parameters = {},
 }) {
-    const response = await fetch(
+    const response = await authFetch(
         `${API_BASE_URL}/preview/`,
         {
             method: "POST",
-            headers: getAuthHeaders(),
+            headers: {
+                "Content-Type": "application/json",
+            },
             body: JSON.stringify({
                 agent_name,
                 tool_name,
@@ -55,11 +45,13 @@ export async function getApprovals(status = "") {
         ? `?status=${encodeURIComponent(status)}`
         : "";
 
-    const response = await fetch(
+    const response = await authFetch(
         `${API_BASE_URL}/${query}`,
         {
             method: "GET",
-            headers: getAuthHeaders(),
+            headers: {
+                "Content-Type": "application/json",
+            },
         }
     );
 
@@ -78,11 +70,13 @@ export async function getApprovals(status = "") {
 
 
 export async function getApproval(actionId) {
-    const response = await fetch(
+    const response = await authFetch(
         `${API_BASE_URL}/${actionId}/`,
         {
             method: "GET",
-            headers: getAuthHeaders(),
+            headers: {
+                "Content-Type": "application/json",
+            },
         }
     );
 
@@ -101,11 +95,13 @@ export async function getApproval(actionId) {
 
 
 export async function approveAction(actionId) {
-    const response = await fetch(
+    const response = await authFetch(
         `${API_BASE_URL}/${actionId}/approve/`,
         {
             method: "POST",
-            headers: getAuthHeaders(),
+            headers: {
+                "Content-Type": "application/json",
+            },
         }
     );
 
@@ -127,11 +123,13 @@ export async function editApproval(
     actionId,
     parameters
 ) {
-    const response = await fetch(
+    const response = await authFetch(
         `${API_BASE_URL}/${actionId}/edit/`,
         {
             method: "PUT",
-            headers: getAuthHeaders(),
+            headers: {
+                "Content-Type": "application/json",
+            },
             body: JSON.stringify({
                 parameters,
             }),
@@ -153,11 +151,13 @@ export async function editApproval(
 
 
 export async function cancelAction(actionId) {
-    const response = await fetch(
+    const response = await authFetch(
         `${API_BASE_URL}/${actionId}/cancel/`,
         {
             method: "POST",
-            headers: getAuthHeaders(),
+            headers: {
+                "Content-Type": "application/json",
+            },
         }
     );
 

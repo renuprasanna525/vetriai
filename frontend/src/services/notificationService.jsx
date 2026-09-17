@@ -1,15 +1,19 @@
+import { authFetch } from "./authFetch";
+
 const API_BASE_URL =
     "https://vetri-ai-backend-i3pw.onrender.com/api/notifications";
 
 
-export async function getNotifications(accessToken) {
-    const response = await fetch(`${API_BASE_URL}/`, {
-        method: "GET",
-        headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-        },
-    });
+export async function getNotifications() {
+    const response = await authFetch(
+        `${API_BASE_URL}/`,
+        {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+            },
+        }
+    );
 
     const data = await response.json();
 
@@ -23,16 +27,12 @@ export async function getNotifications(accessToken) {
 }
 
 
-export async function getNotification(
-    notificationId,
-    accessToken
-) {
-    const response = await fetch(
+export async function getNotification(notificationId) {
+    const response = await authFetch(
         `${API_BASE_URL}/${notificationId}/`,
         {
             method: "GET",
             headers: {
-                Authorization: `Bearer ${accessToken}`,
                 "Content-Type": "application/json",
             },
         }
@@ -50,16 +50,12 @@ export async function getNotification(
 }
 
 
-export async function markNotificationRead(
-    notificationId,
-    accessToken
-) {
-    const response = await fetch(
+export async function markNotificationRead(notificationId) {
+    const response = await authFetch(
         `${API_BASE_URL}/${notificationId}/read/`,
         {
             method: "PUT",
             headers: {
-                Authorization: `Bearer ${accessToken}`,
                 "Content-Type": "application/json",
             },
         }

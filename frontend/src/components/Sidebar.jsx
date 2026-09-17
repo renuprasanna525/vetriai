@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { getNotifications } from "../services/notificationService";
+import { getCurrentUser } from "../services/authService";
 
 function Sidebar() {
     const navigate = useNavigate();
@@ -10,8 +11,32 @@ function Sidebar() {
     const [unreadCount, setUnreadCount] = useState(0);
     const [isOpen, setIsOpen] = useState(false);
 
+    const [currentUser, setCurrentUser] = useState({
+        name: "User",
+        role: "Employee",
+    });
+
     function isActive(path) {
         return location.pathname === path;
+    }
+
+    async function loadCurrentUser() {
+        try {
+            const accessToken = localStorage.getItem("access_token");
+
+            if (!accessToken) {
+                return;
+            }
+
+            const user = await getCurrentUser();
+
+            setCurrentUser({
+                name: user.name || user.username || "User",
+                role: user.role || "Employee",
+            });
+        } catch (error) {
+            console.error("Failed to load current user:", error);
+        }
     }
 
     async function loadUnreadCount() {
@@ -23,7 +48,7 @@ function Sidebar() {
                 return;
             }
 
-            const notifications = await getNotifications(accessToken);
+            const notifications = await getNotifications();
 
             const unreadNotifications = notifications.filter(
                 (notification) => !notification.is_read
@@ -41,6 +66,7 @@ function Sidebar() {
     }
 
     useEffect(() => {
+        loadCurrentUser();
         loadUnreadCount();
 
         const interval = setInterval(() => {
@@ -213,11 +239,11 @@ function Sidebar() {
 
                         <div>
                             <div className="user-name">
-                                Renuka
+                                {currentUser.name}
                             </div>
 
                             <div className="user-role">
-                                Administrator
+                                {currentUser.role}
                             </div>
                         </div>
 
@@ -240,4 +266,3 @@ function Sidebar() {
 }
 
 export default Sidebar;
-

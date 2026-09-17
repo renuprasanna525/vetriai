@@ -1,18 +1,15 @@
-const API_BASE_URL = "https://vetri-ai-backend-i3pw.onrender.com/api";
+import { authFetch } from "./authFetch";
+
+const API_BASE_URL =
+    "https://vetri-ai-backend-i3pw.onrender.com/api";
+
 
 export async function getUserRoles() {
-    const accessToken = localStorage.getItem("access_token");
-
-    if (!accessToken) {
-        throw new Error("You are not logged in.");
-    }
-
-    const response = await fetch(
+    const response = await authFetch(
         `${API_BASE_URL}/user-roles/`,
         {
             method: "GET",
             headers: {
-                Authorization: `Bearer ${accessToken}`,
                 "Content-Type": "application/json",
             },
         }
@@ -29,19 +26,13 @@ export async function getUserRoles() {
     return data;
 }
 
+
 export async function getPermissions() {
-    const accessToken = localStorage.getItem("access_token");
-
-    if (!accessToken) {
-        throw new Error("You are not logged in.");
-    }
-
-    const response = await fetch(
+    const response = await authFetch(
         `${API_BASE_URL}/permissions/`,
         {
             method: "GET",
             headers: {
-                Authorization: `Bearer ${accessToken}`,
                 "Content-Type": "application/json",
             },
         }
@@ -60,18 +51,11 @@ export async function getPermissions() {
 
 
 export async function getAgents() {
-    const accessToken = localStorage.getItem("access_token");
-
-    if (!accessToken) {
-        throw new Error("You are not logged in.");
-    }
-
-    const response = await fetch(
+    const response = await authFetch(
         `${API_BASE_URL}/agents/`,
         {
             method: "GET",
             headers: {
-                Authorization: `Bearer ${accessToken}`,
                 "Content-Type": "application/json",
             },
         }
@@ -88,20 +72,14 @@ export async function getAgents() {
     return data;
 }
 
+
 export async function getDashboard() {
-    const accessToken = localStorage.getItem('access_token');
-
-    if (!accessToken) {
-        throw new Error('You are not logged in.');
-    }
-
-    const response = await fetch(
+    const response = await authFetch(
         `${API_BASE_URL}/dashboard/`,
         {
-            method: 'GET',
+            method: "GET",
             headers: {
-                Authorization: `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
+                "Content-Type": "application/json",
             },
         }
     );
@@ -110,7 +88,7 @@ export async function getDashboard() {
 
     if (!response.ok) {
         throw new Error(
-            data.detail || 'Failed to fetch dashboard data.'
+            data.detail || "Failed to fetch dashboard data."
         );
     }
 

@@ -24,7 +24,7 @@ function DashboardNavbar() {
                 return;
             }
 
-            const notifications = await getNotifications(accessToken);
+            const notifications = await getNotifications();
 
             const unreadNotifications = notifications.filter(
                 (notification) => !notification.is_read

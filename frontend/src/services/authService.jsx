@@ -1,12 +1,16 @@
-const API_BASE_URL = 'https://vetri-ai-backend-i3pw.onrender.com/api';
+import { authFetch } from "./authFetch";
+
+const API_BASE_URL =
+    "https://vetri-ai-backend-i3pw.onrender.com/api";
+
 
 export async function loginUser(username, password) {
     const response = await fetch(
         `${API_BASE_URL}/auth/login/`,
         {
-            method: 'POST',
+            method: "POST",
             headers: {
-                'Content-Type': 'application/json',
+                "Content-Type": "application/json",
             },
             body: JSON.stringify({
                 username,
@@ -19,7 +23,7 @@ export async function loginUser(username, password) {
 
     if (!response.ok) {
         throw new Error(
-            data.detail || 'Invalid username or password'
+            data.detail || "Invalid username or password"
         );
     }
 
@@ -28,19 +32,12 @@ export async function loginUser(username, password) {
 
 
 export async function getCurrentUser() {
-    const accessToken = localStorage.getItem('access_token');
-
-    if (!accessToken) {
-        throw new Error('You are not logged in.');
-    }
-
-    const response = await fetch(
+    const response = await authFetch(
         `${API_BASE_URL}/auth/me/`,
         {
-            method: 'GET',
+            method: "GET",
             headers: {
-                Authorization: `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
+                "Content-Type": "application/json",
             },
         }
     );
@@ -49,7 +46,7 @@ export async function getCurrentUser() {
 
     if (!response.ok) {
         throw new Error(
-            data.detail || 'Failed to get current user'
+            data.detail || "Failed to get current user"
         );
     }
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import "./AIChat.css";
+import { authFetch } from "../services/authFetch";
 
 const API_BASE_URL =
   "https://vetri-ai-backend-i3pw.onrender.com/api";
@@ -36,14 +37,11 @@ function AIChat() {
       }
 
       try {
-        const response = await fetch(
+        const response = await authFetch(
           `${API_BASE_URL}/conversations/`,
           {
             method: "GET",
             credentials: "include",
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
           }
         );
 
@@ -60,14 +58,11 @@ function AIChat() {
 
           setConversationId(latestConversation.id);
 
-          const detailResponse = await fetch(
+          const detailResponse = await authFetch(
             `${API_BASE_URL}/conversations/${latestConversation.id}/`,
             {
               method: "GET",
               credentials: "include",
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
-              },
             }
           );
 
@@ -168,14 +163,13 @@ function AIChat() {
         requestBody.conversation_id = conversationId;
       }
 
-      const response = await fetch(
+      const response = await authFetch(
         `${API_BASE_URL}/chat/`,
         {
           method: "POST",
           credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify(requestBody),
         }
