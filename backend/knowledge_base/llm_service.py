@@ -1,5 +1,4 @@
 import json
-import time
 
 from django.conf import settings
 from google import genai
@@ -13,7 +12,7 @@ class LLMService:
     """
 
     # Gemini network timeout in milliseconds.
-    # 30 seconds prevents the Render worker from waiting indefinitely.
+    # This prevents the Render worker from waiting indefinitely.
     GEMINI_TIMEOUT_MS = 30000
 
     def __init__(self):
@@ -87,11 +86,14 @@ class LLMService:
             "rpd",
         ]
 
-        return any(indicator in error_message for indicator in daily_quota_indicators)
+        return any(
+            indicator in error_message
+            for indicator in daily_quota_indicators
+        )
 
     def _is_temporary_error(self, error_message):
         """
-        Detect temporary Gemini/network availability errors.
+        Detect Gemini temporary/network availability errors.
         """
 
         temporary_error_indicators = [
@@ -110,7 +112,8 @@ class LLMService:
         ]
 
         return any(
-            indicator in error_message for indicator in temporary_error_indicators
+            indicator in error_message
+            for indicator in temporary_error_indicators
         )
 
     def _generate_response(self, prompt):
@@ -120,11 +123,12 @@ class LLMService:
         Behavior:
 
         - Successful Gemini request -> return Gemini response.
-        - Daily quota error -> stop immediately and use fallback.
-        - Temporary/network error -> retry once.
-        - Final Gemini failure -> return None.
-        - Returning None allows the orchestrator to use its
-          verified application fallback response.
+        - Daily quota error -> return None and use fallback.
+        - Temporary/network error -> return None and use fallback.
+        - Other Gemini failure -> return None and use fallback.
+
+        Returning None allows the orchestrator to use its
+        verified application fallback response.
         """
 
         client = self._get_client()
@@ -133,64 +137,55 @@ class LLMService:
             print("GEMINI API IS NOT AVAILABLE.")
             return None
 
-        max_retries = 1
-        retry_delay = 2
+        try:
+            response = client.models.generate_content(
+                model=settings.GEMINI_MODEL,
+                contents=prompt,
+            )
 
-        for attempt in range(max_retries + 1):
-            try:
-                response = client.models.generate_content(
-                    model=settings.GEMINI_MODEL,
-                    contents=prompt,
-                )
-
-                if not response:
-                    print("GEMINI RETURNED EMPTY RESPONSE.")
-                    return None
-
-                response_text = getattr(
-                    response,
-                    "text",
-                    None,
-                )
-
-                if not response_text:
-                    print("GEMINI RETURNED NO TEXT RESPONSE.")
-                    return None
-
-                return response_text.strip()
-
-            except Exception as error:
-                error_message = str(error).lower()
-
-                print(
-                    f"GEMINI ERROR ON ATTEMPT {attempt + 1}:",
-                    str(error),
-                )
-
-                # Daily quota errors should not be retried.
-                if self._is_daily_quota_error(error_message):
-                    print(
-                        "GEMINI DAILY QUOTA EXHAUSTED. "
-                        "USING APPLICATION FALLBACK RESPONSE."
-                    )
-                    return None
-
-                # Retry temporary/network failures only once.
-                if self._is_temporary_error(error_message) and attempt < max_retries:
-                    print(
-                        "GEMINI TEMPORARY OR NETWORK ERROR. "
-                        f"Retrying once in {retry_delay} seconds..."
-                    )
-
-                    time.sleep(retry_delay)
-                    continue
-
-                # Final failure.
-                print("GEMINI RESPONSE FAILED. " "USING APPLICATION FALLBACK RESPONSE.")
-
+            if not response:
+                print("GEMINI RETURNED EMPTY RESPONSE.")
                 return None
 
-        return None
+            response_text = getattr(
+                response,
+                "text",
+                None,
+            )
+
+            if not response_text:
+                print("GEMINI RETURNED NO TEXT RESPONSE.")
+                return None
+
+            return response_text.strip()
+
+        except Exception as error:
+            error_message = str(error).lower()
+
+            print(
+                "GEMINI RESPONSE ERROR:",
+                str(error),
+            )
+
+            if self._is_daily_quota_error(error_message):
+                print(
+                    "GEMINI DAILY QUOTA EXHAUSTED. "
+                    "USING APPLICATION FALLBACK RESPONSE."
+                )
+
+            elif self._is_temporary_error(error_message):
+                print(
+                    "GEMINI TEMPORARY OR NETWORK ERROR. "
+                    "USING APPLICATION FALLBACK RESPONSE."
+                )
+
+            else:
+                print(
+                    "GEMINI RESPONSE FAILED. "
+                    "USING APPLICATION FALLBACK RESPONSE."
+                )
+
+            return None
 
     def generate_answer(self, question, context):
         """

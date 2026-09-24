@@ -235,46 +235,46 @@ class AIOrchestrator:
                 "this task",
             ]
 
-        # Exact short reference questions
-        if request_lower in reference_phrases:
-            return True
-
-        words = request_lower.split()
-
-        # -------------------------------------------------
-        # Pronoun-based references
-        # -------------------------------------------------
-
-        if "it" in words:
-            return True
-
-        if "its" in words:
-            return True
-
-        if "their" in words:
-            return True
-
-        # -------------------------------------------------
-        # That / this references
-        # -------------------------------------------------
-
-        if "that" in words or "this" in words:
-
-            reference_patterns = [
-                "that project",
-                "this project",
-                "that one",
-                "this one",
-                "that customer",
-                "this customer",
-                "that employee",
-                "this employee",
-                "that task",
-                "this task",
-            ]
-
-            if any(phrase in request_lower for phrase in reference_patterns):
+            # Exact short reference questions
+            if request_lower in reference_phrases:
                 return True
+
+            words = request_lower.split()
+
+            # -------------------------------------------------
+            # Pronoun-based references
+            # -------------------------------------------------
+
+            if "it" in words:
+                return True
+
+            if "its" in words:
+                return True
+
+            if "their" in words:
+                return True
+
+            # -------------------------------------------------
+            # That / this references
+            # -------------------------------------------------
+
+            if "that" in words or "this" in words:
+
+                reference_patterns = [
+                    "that project",
+                    "this project",
+                    "that one",
+                    "this one",
+                    "that customer",
+                    "this customer",
+                    "that employee",
+                    "this employee",
+                    "that task",
+                    "this task",
+                ]
+
+                if any(phrase in request_lower for phrase in reference_patterns):
+                    return True
 
             return False
 
@@ -1771,12 +1771,15 @@ class AIOrchestrator:
         # 10. Natural response
         # -----------------------------------------------------
 
-        response_message = self.generate_natural_response(
-            request=request,
-            results=results,
-            conversation_history=conversation_history,
-            fallback_response=fallback_response,
-        )
+        #
+        # Contextual follow-up responses already have verified
+        # business information and a safe fallback response.
+        #
+        # Do not call Gemini again here. This prevents a temporary
+        # Gemini/network problem from hanging the Render worker.
+        #
+
+        response_message = fallback_response
 
         # -----------------------------------------------------
         # 11. Audit log
