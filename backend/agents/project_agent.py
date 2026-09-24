@@ -4,9 +4,7 @@ from knowledge_base.rag import RAGSystem
 
 
 class ProjectAgent(BaseAgent):
-
     name = "Project Agent"
-
     description = "Handles project status and project tracking questions"
 
     def __init__(self):
@@ -14,7 +12,6 @@ class ProjectAgent(BaseAgent):
         self.rag = RAGSystem()
 
     def can_handle(self, request):
-
         project_keywords = [
             "project",
             "projects",
@@ -37,67 +34,27 @@ class ProjectAgent(BaseAgent):
         return any(keyword in request_lower for keyword in project_keywords)
 
     def get_required_permission(self, request):
-
         request_lower = request.lower()
 
-        # -----------------------------------------
-        # Knowledge Base / Project SOP questions
-        # -----------------------------------------
-
-        knowledge_keywords = [
-            "policy",
-            "sop",
-            "process",
-            "procedure",
-            "how can",
-            "how do",
-            "how should",
-            "project management",
-            "project process",
-        ]
-
-        is_knowledge_question = any(
-            keyword in request_lower for keyword in knowledge_keywords
-        )
-
-        if is_knowledge_question:
-            return None
-
-        # -----------------------------------------
-        # Project deadlines
-        # -----------------------------------------
-
-        if "deadline" in request_lower or "deadlines" in request_lower:
-            return "view_project_status"
-
-        # -----------------------------------------
-        # Project status / delayed projects
-        # -----------------------------------------
-
-        if (
-            "status" in request_lower
-            or "delayed" in request_lower
-            or "delay" in request_lower
+        if any(
+            keyword in request_lower
+            for keyword in [
+                "status",
+                "delayed",
+                "delay",
+                "deadline",
+                "milestone",
+            ]
         ):
             return "view_project_status"
 
-        # -----------------------------------------
-        # Employee's own tasks
-        # -----------------------------------------
-
-        if "task" in request_lower or "tasks" in request_lower:
-
+        if "task" in request_lower:
             if "my" in request_lower or "own" in request_lower:
                 return "view_own_tasks"
 
             return "view_projects"
 
-        # -----------------------------------------
-        # Employee's own projects
-        # -----------------------------------------
-
-        if "project" in request_lower or "projects" in request_lower:
-
+        if "project" in request_lower:
             if "my" in request_lower or "own" in request_lower:
                 return "view_own_projects"
 
@@ -106,82 +63,127 @@ class ProjectAgent(BaseAgent):
         return "view_projects"
 
     def process(self, request, user, credentials=None):
-
         request_lower = request.lower()
 
-        # =========================================
-        # Knowledge Base / Project SOP Questions
-        # =========================================
+        # =====================================================
+        # PROJECT KNOWLEDGE / RAG
+        # =====================================================
 
         knowledge_keywords = [
-            "policy",
-            "sop",
-            "process",
-            "procedure",
-            "how can",
-            "how do",
-            "how should",
-            "project management",
+            "project policy",
+            "project sop",
             "project process",
+            "project guidelines",
+            "project procedure",
         ]
 
-        is_knowledge_question = any(
-            keyword in request_lower for keyword in knowledge_keywords
-        )
-
-        if is_knowledge_question:
-
-            knowledge_answer = self.rag.generate_answer(request)
-
-            if knowledge_answer:
+        if any(keyword in request_lower for keyword in knowledge_keywords):
+            try:
+                rag_result = self.rag.query(request)
 
                 return {
                     "agent": self.name,
                     "status": "success",
-                    "data": {
-                        "knowledge_answer": knowledge_answer,
-                    },
-                    "message": knowledge_answer,
+                    "data": rag_result,
+                    "message": str(rag_result),
                 }
 
-        # -----------------------------------------
-        # Delayed Projects
-        # -----------------------------------------
+            except Exception as e:
+                return {
+                    "agent": self.name,
+                    "status": "error",
+                    "data": {},
+                    "message": f"Unable to retrieve project knowledge: {str(e)}",
+                }
+
+        # =====================================================
+        # KNOWN PROJECT NAMES
+        # =====================================================
+
+        project_names = [
+            "Vetri E-Commerce",
+            "AI Dashboard",
+            "CRM System",
+            "HR Management System",
+        ]
+
+        requested_project = None
+
+        for project_name in project_names:
+            if project_name.lower() in request_lower:
+                requested_project = project_name
+                break
+
+        # =====================================================
+        # SPECIFIC PROJECT REQUEST
+        # Example:
+        # "Tell me about Vetri E-Commerce"
+        # =====================================================
+
+        if requested_project:
+            result = self.project_tool.execute("get_projects", user)
+
+            if result.get("status") == "success":
+                data = result.get("data", {})
+                projects = data.get("projects", [])
+
+                matching_project = next(
+                    (
+                        project
+                        for project in projects
+                        if project.get("name", "").lower() == requested_project.lower()
+                    ),
+                    None,
+                )
+
+                if matching_project:
+                    project_name = matching_project.get("name", requested_project)
+
+                    project_status = matching_project.get("status", "Unknown")
+
+                    progress = matching_project.get("progress", "Unknown")
+
+                    message = (
+                        f"{project_name} is currently "
+                        f"{project_status} with "
+                        f"{progress}% progress."
+                    )
+
+                    return {
+                        "agent": self.name,
+                        "status": "success",
+                        "data": {"project": matching_project},
+                        "message": message,
+                    }
+
+        # =====================================================
+        # DELAYED PROJECTS
+        # =====================================================
 
         if "delayed" in request_lower or "delay" in request_lower:
-
-            result = self.project_tool.execute(
-                "get_delayed_projects",
-                user,
-            )
+            result = self.project_tool.execute("get_delayed_projects", user)
 
             if result.get("status") == "success":
-
                 data = result.get("data", {})
+                delayed_projects = data.get("delayed_projects", [])
 
-                projects = data.get(
-                    "delayed_projects",
-                    [],
-                )
+                if delayed_projects:
+                    details = []
 
-                if not projects:
+                    for project in delayed_projects:
+                        name = project.get("name", "Unknown project")
 
-                    message = "There are no delayed projects."
+                        delay_days = project.get("delay_days", 0)
 
-                else:
-
-                    lines = []
-
-                    for project in projects:
-
-                        lines.append(
-                            f"{project['name']} " f"({project['delay_days']} days)"
-                        )
+                        details.append(f"{name} is delayed by " f"{delay_days} days")
 
                     message = (
-                        f"There are {len(projects)} "
-                        "delayed projects:\n" + "\n".join(lines)
+                        "The currently delayed projects are: "
+                        + ", ".join(details)
+                        + "."
                     )
+                else:
+                    message = "There are currently no delayed projects."
 
                 return {
                     "agent": self.name,
@@ -190,155 +192,32 @@ class ProjectAgent(BaseAgent):
                     "message": message,
                 }
 
-        # -----------------------------------------
-        # Project Status
-        # -----------------------------------------
-
-        if "status" in request_lower:
-
-            result = self.project_tool.execute(
-                "get_project_status",
-                user,
-            )
-
-            if result.get("status") == "success":
-
-                data = result.get("data", {})
-
-                message = (
-                    "Project Status:\n"
-                    f"Active: {data.get('active_projects', 0)}\n"
-                    f"Completed: {data.get('completed_projects', 0)}\n"
-                    f"Delayed: {data.get('delayed_projects', 0)}"
-                )
-
-                return {
-                    "agent": self.name,
-                    "status": "success",
-                    "data": data,
-                    "message": message,
-                }
-
-        # -----------------------------------------
-        # Project Deadlines
-        # -----------------------------------------
+        # =====================================================
+        # PROJECT DEADLINES
+        # =====================================================
 
         if "deadline" in request_lower or "deadlines" in request_lower:
-
-            result = self.project_tool.execute(
-                "get_project_deadlines",
-                user,
-            )
+            result = self.project_tool.execute("get_project_deadlines", user)
 
             if result.get("status") == "success":
-
                 data = result.get("data", {})
+                deadlines = data.get("deadlines", [])
 
-                deadlines = data.get(
-                    "deadlines",
-                    [],
-                )
-
-                if not deadlines:
-
-                    message = "There are no upcoming deadlines."
-
-                else:
-
-                    lines = []
+                if deadlines:
+                    details = []
 
                     for deadline in deadlines:
+                        project = deadline.get("project", "Unknown project")
 
-                        lines.append(
-                            f"{deadline['project']} - " f"{deadline['deadline']}"
-                        )
+                        date = deadline.get("deadline", "Unknown")
 
-                    message = "Upcoming Project Deadlines:\n" + "\n".join(lines)
-
-                return {
-                    "agent": self.name,
-                    "status": "success",
-                    "data": data,
-                    "message": message,
-                }
-
-        # -----------------------------------------
-        # Project Tasks
-        # -----------------------------------------
-
-        if "task" in request_lower:
-
-            result = self.project_tool.execute(
-                "get_project_tasks",
-                user,
-            )
-
-            if result.get("status") == "success":
-
-                data = result.get("data", {})
-
-                tasks = data.get(
-                    "tasks",
-                    [],
-                )
-
-                if not tasks:
-
-                    message = "There are no project tasks."
-
-                else:
-
-                    lines = []
-
-                    for task in tasks:
-
-                        lines.append(
-                            f"{task['project']}: "
-                            f"{task['task']} "
-                            f"({task['status']})"
-                        )
-
-                    message = "Current Project Tasks:\n" + "\n".join(lines)
-
-                return {
-                    "agent": self.name,
-                    "status": "success",
-                    "data": data,
-                    "message": message,
-                }
-
-        # -----------------------------------------
-        # Projects
-        # -----------------------------------------
-
-        if "project" in request_lower:
-
-            result = self.project_tool.execute(
-                "get_projects",
-                user,
-            )
-
-            if result.get("status") == "success":
-
-                data = result.get("data", {})
-
-                projects = data.get(
-                    "projects",
-                    [],
-                )
-
-                if not projects:
-
-                    message = "There are no projects."
-
-                else:
-
-                    names = [project["name"] for project in projects]
+                        details.append(f"{project}: {date}")
 
                     message = (
-                        f"There are {len(projects)} "
-                        "projects: " + ", ".join(names) + "."
+                        "Here are the project deadlines: " + "; ".join(details) + "."
                     )
+                else:
+                    message = "There are currently no project deadlines available."
 
                 return {
                     "agent": self.name,
@@ -347,9 +226,100 @@ class ProjectAgent(BaseAgent):
                     "message": message,
                 }
 
-        # -----------------------------------------
-        # Unsupported Request
-        # -----------------------------------------
+        # =====================================================
+        # PROJECT TASKS
+        # =====================================================
+
+        if "task" in request_lower or "tasks" in request_lower:
+            result = self.project_tool.execute("get_project_tasks", user)
+
+            if result.get("status") == "success":
+                data = result.get("data", {})
+                tasks = data.get("tasks", [])
+
+                if tasks:
+                    details = []
+
+                    for task in tasks:
+                        project = task.get("project", "Unknown project")
+
+                        task_name = task.get("task", "Unknown task")
+
+                        status = task.get("status", "Unknown")
+
+                        details.append(f"{task_name} ({project}) - {status}")
+
+                    message = (
+                        "Here are the available project tasks: "
+                        + "; ".join(details)
+                        + "."
+                    )
+                else:
+                    message = "There are currently no project tasks available."
+
+                return {
+                    "agent": self.name,
+                    "status": "success",
+                    "data": data,
+                    "message": message,
+                }
+
+        # =====================================================
+        # PROJECT STATUS SUMMARY
+        # =====================================================
+
+        if "status" in request_lower:
+            result = self.project_tool.execute("get_project_status", user)
+
+            if result.get("status") == "success":
+                data = result.get("data", {})
+
+                active = data.get("active_projects", 0)
+
+                completed = data.get("completed_projects", 0)
+
+                delayed = data.get("delayed_projects", 0)
+
+                message = (
+                    f"Currently, there are {active} active projects, "
+                    f"{completed} completed projects, and "
+                    f"{delayed} delayed projects."
+                )
+
+                return {
+                    "agent": self.name,
+                    "status": "success",
+                    "data": data,
+                    "message": message,
+                }
+
+        # =====================================================
+        # ALL PROJECTS
+        # =====================================================
+
+        if "project" in request_lower:
+            result = self.project_tool.execute("get_projects", user)
+
+            if result.get("status") == "success":
+                data = result.get("data", {})
+                projects = data.get("projects", [])
+
+                names = [project.get("name", "Unknown project") for project in projects]
+
+                message = (
+                    f"There are {len(projects)} projects: " + ", ".join(names) + "."
+                )
+
+                return {
+                    "agent": self.name,
+                    "status": "success",
+                    "data": data,
+                    "message": message,
+                }
+
+        # =====================================================
+        # UNSUPPORTED REQUEST
+        # =====================================================
 
         return {
             "agent": self.name,

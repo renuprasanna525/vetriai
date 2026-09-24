@@ -4,7 +4,6 @@ import { authFetch } from "../services/authFetch";
 
 const API_BASE_URL =
   "https://vetri-ai-backend-i3pw.onrender.com/api";
-
 const AI_BOT_IMAGE = "/ai-bot.gif";
 
 function AIChat() {
@@ -238,6 +237,23 @@ function AIChat() {
     inputRef.current?.focus();
   };
 
+  const handleNewChat = () => {
+    setConversationId(null);
+
+    setMessages([
+      {
+        sender: "ai",
+        text: "Hello! I am Vetri AI BO Assistant. How can I help you today?",
+      },
+    ]);
+
+    setQuestion("");
+
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+  };
+
   return (
     <div className="ai-chat-page">
 
@@ -309,8 +325,22 @@ function AIChat() {
           </div>
 
 
-          <div className="ai-chat-header-icon">
-            <i className="bi bi-three-dots-vertical"></i>
+          <div className="ai-chat-header-actions">
+
+            <button
+              type="button"
+              className="ai-new-chat-button"
+              onClick={handleNewChat}
+              title="Start a new conversation"
+            >
+              <i className="bi bi-plus-lg"></i>
+              <span>New Chat</span>
+            </button>
+
+            <div className="ai-chat-header-icon">
+              <i className="bi bi-three-dots-vertical"></i>
+            </div>
+
           </div>
 
         </div>

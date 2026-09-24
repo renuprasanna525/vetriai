@@ -1,15 +1,193 @@
+import json
+import time
+
 from django.conf import settings
-from openai import OpenAI
+from google import genai
 
 
 class LLMService:
     """
     Service responsible for generating natural-language
-    answers using an OpenAI LLM.
+    answers using the Gemini LLM.
     """
 
     def __init__(self):
-        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        """
+        Initialize the Gemini client safely.
+
+        If the API key is missing or the client cannot be
+        initialized, the application can continue running.
+        """
+
+        self.client = None
+        self.api_key = getattr(settings, "GEMINI_API_KEY", "")
+
+        if self.api_key:
+            try:
+                self.client = genai.Client(api_key=self.api_key)
+            except Exception as error:
+                print("GEMINI CLIENT INITIALIZATION ERROR:", str(error))
+                self.client = None
+
+    # =====================================================
+    # GET GEMINI CLIENT
+    # =====================================================
+
+    def _get_client(self):
+        """
+        Return the Gemini client.
+
+        If the client was not initialized earlier, try to
+        initialize it again.
+        """
+
+        if self.client is not None:
+            return self.client
+
+        if not self.api_key:
+            return None
+
+        try:
+            self.client = genai.Client(api_key=self.api_key)
+            return self.client
+
+        except Exception as error:
+            print("GEMINI CLIENT INITIALIZATION ERROR:", str(error))
+            return None
+
+    # =====================================================
+    # GEMINI ERROR HELPERS
+    # =====================================================
+
+    def _is_daily_quota_error(self, error_message):
+        """
+        Detect Gemini daily free-tier quota exhaustion.
+
+        This should NOT be retried repeatedly because the
+        quota is a daily limit rather than a temporary
+        service-availability problem.
+        """
+
+        daily_quota_indicators = [
+            "generaterequestsperdayperprojectpermodel-freetier",
+            "generate_content_free_tier_requests",
+            "quota exceeded for metric",
+            "you exceeded your current quota",
+            "quota exhausted",
+            "daily quota",
+            "rpd",
+        ]
+
+        return any(indicator in error_message for indicator in daily_quota_indicators)
+
+    def _is_temporary_error(self, error_message):
+        """
+        Detect temporary Gemini service/rate-limit errors
+        that are reasonable to retry.
+        """
+
+        temporary_error_indicators = [
+            "503",
+            "unavailable",
+            "service unavailable",
+            "high demand",
+            "temporarily unavailable",
+        ]
+
+        return any(
+            indicator in error_message for indicator in temporary_error_indicators
+        )
+
+    # =====================================================
+    # GENERATE GEMINI RESPONSE
+    # =====================================================
+
+    def _generate_response(self, prompt):
+        """
+        Generate a text response using Gemini.
+
+        Behavior:
+
+        - Daily free-tier quota exhaustion:
+          Do NOT repeatedly retry.
+
+        - Temporary 503/service-unavailable errors:
+          Retry up to 3 total attempts.
+
+        - Other errors:
+          Raise the original error so the existing
+          application fallback/error handling can handle it.
+        """
+
+        client = self._get_client()
+
+        if client is None:
+            raise RuntimeError("Gemini API is not available.")
+
+        max_retries = 2
+        retry_delays = [2, 4]
+
+        for attempt in range(max_retries + 1):
+            try:
+                response = client.models.generate_content(
+                    model=settings.GEMINI_MODEL,
+                    contents=prompt,
+                )
+
+                if not response:
+                    raise RuntimeError("Gemini returned an empty response.")
+
+                response_text = getattr(response, "text", None)
+
+                if not response_text:
+                    raise RuntimeError("Gemini returned no text response.")
+
+                return response_text.strip()
+
+            except Exception as error:
+                error_message = str(error).lower()
+
+                # =================================================
+                # DAILY QUOTA EXHAUSTED
+                # =================================================
+
+                if self._is_daily_quota_error(error_message):
+                    print(
+                        "GEMINI DAILY QUOTA EXHAUSTED. "
+                        "No additional retry will be attempted."
+                    )
+
+                    raise RuntimeError(
+                        "Gemini daily API quota has been exhausted. "
+                        "Please try again after the quota resets."
+                    ) from error
+
+                # =================================================
+                # TEMPORARY GEMINI SERVICE ERROR
+                # =================================================
+
+                if self._is_temporary_error(error_message) and attempt < max_retries:
+                    delay = retry_delays[attempt]
+
+                    print(
+                        f"GEMINI TEMPORARY ERROR "
+                        f"(attempt {attempt + 1}/{max_retries + 1}). "
+                        f"Retrying in {delay} seconds..."
+                    )
+
+                    time.sleep(delay)
+                    continue
+
+                # =================================================
+                # OTHER GEMINI ERRORS
+                # =================================================
+
+                print("GEMINI RESPONSE ERROR:", str(error))
+                raise
+
+    # =====================================================
+    # RAG RESPONSE
+    # =====================================================
 
     def generate_answer(self, question, context):
         """
@@ -27,18 +205,101 @@ If the answer cannot be found in the provided
 company knowledge, say that the information is
 not available in the company knowledge base.
 
+Do not invent facts, numbers, names, or business
+information.
+
 Company Knowledge:
 {context}
 
 User Question:
 {question}
 
-Provide a clear and concise answer.
+Provide a clear and useful answer.
 """
 
-        response = self.client.responses.create(
-            model=settings.OPENAI_MODEL,
-            input=prompt,
+        return self._generate_response(prompt)
+
+    # =====================================================
+    # NATURAL CHAT RESPONSE
+    # =====================================================
+
+    def generate_chat_response(
+        self,
+        question,
+        agent_results,
+        conversation_context="",
+    ):
+        """
+        Convert structured multi-agent results into
+        a natural, conversational AI response.
+        """
+
+        # Convert agent results into readable JSON so that
+        # Gemini receives structured and reliable information.
+        agent_results_text = json.dumps(
+            agent_results,
+            indent=2,
+            default=str,
         )
 
-        return response.output_text
+        prompt = f"""
+You are Vetri AI, a professional business AI assistant.
+
+Your job is to answer the user's question naturally,
+clearly, and conversationally using the verified
+business information returned by the authorized agents.
+
+IMPORTANT RULES:
+
+1. Use ONLY the information provided in the agent results.
+2. Do not invent numbers, facts, names, events, or business information.
+3. Do not change numerical values.
+4. Do not claim that an action was completed unless the agent result says so.
+5. Respect the user's previous conversation context.
+6. If multiple agents provided information, combine the information
+   into one coherent answer.
+7. Do not expose internal agent-processing details unless useful.
+8. Do not say "Agent 1", "Agent 2", etc.
+9. Use natural business language.
+10. Give enough explanation to feel like a real AI assistant.
+11. Avoid extremely short one-line answers when useful details are available.
+12. Do not add information that is not present in the results.
+13. Do not make unsupported judgments such as "good", "bad",
+    "positive", "negative", "strong", "weak", "healthy", or
+    "needs improvement" unless the agent results explicitly
+    support that statement.
+14. You may explain or reorganize the provided information,
+    but do not introduce new business facts.
+15. If an agent provides only summary figures, clearly describe
+    those figures without pretending that additional detailed
+    information is available.
+16. If an agent failed, clearly mention that the information could
+    not be retrieved rather than guessing.
+17. Use headings or bullet points only when they improve readability.
+18. Do not repeatedly use the same follow-up wording.
+19. Keep the answer focused on the user's question.
+20. If the user asks a follow-up question, use the previous conversation
+    context to understand what they are referring to.
+21. Do not mention Gemini, OpenAI, the LLM, prompts, or internal
+    implementation details to the user.
+22. If the available information is limited, clearly state what is
+    available instead of making assumptions.
+23. When several business areas are available, organize the response
+    so that the information is easy to understand.
+24. Prefer complete sentences and short explanations over raw data dumps.
+25. Answer the user's actual question first, then provide supporting
+    details when useful.
+
+PREVIOUS CONVERSATION:
+{conversation_context}
+
+CURRENT USER QUESTION:
+{question}
+
+AUTHORIZED AGENT RESULTS:
+{agent_results_text}
+
+Now provide the final response to the user.
+"""
+
+        return self._generate_response(prompt)

@@ -113,6 +113,12 @@ def chat_api(request):
             title="New Conversation",
         )
 
+    conversation_history = list(
+        ChatMessage.objects.filter(conversation=conversation)
+        .order_by("created_at")
+        .values("sender", "content")
+    )
+
     # -------------------------------------------------
     # Save User Message
     # -------------------------------------------------
@@ -121,6 +127,13 @@ def chat_api(request):
         conversation=conversation,
         sender="user",
         content=message,
+    )
+
+    conversation_history.append(
+        {
+            "sender": "user",
+            "content": message,
+        }
     )
 
     # -------------------------------------------------
@@ -151,6 +164,7 @@ def chat_api(request):
             user=user,
             role=role,
             credentials=google_credentials,
+            conversation_history=conversation_history,
         )
 
         print("STEP 4: Orchestrator completed successfully")
