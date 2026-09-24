@@ -3,6 +3,7 @@ import time
 
 from django.conf import settings
 from google import genai
+from google.genai import types
 
 
 class LLMService:
@@ -10,6 +11,10 @@ class LLMService:
     Service responsible for generating natural-language
     answers using the Gemini LLM.
     """
+
+    # Gemini network timeout in milliseconds.
+    # 30 seconds prevents the Render worker from waiting indefinitely.
+    GEMINI_TIMEOUT_MS = 30000
 
     def __init__(self):
         """
@@ -24,46 +29,52 @@ class LLMService:
 
         if self.api_key:
             try:
-                self.client = genai.Client(api_key=self.api_key)
+                self.client = genai.Client(
+                    api_key=self.api_key,
+                    http_options=types.HttpOptions(
+                        timeout=self.GEMINI_TIMEOUT_MS,
+                    ),
+                )
             except Exception as error:
-                print("GEMINI CLIENT INITIALIZATION ERROR:", str(error))
+                print(
+                    "GEMINI CLIENT INITIALIZATION ERROR:",
+                    str(error),
+                )
                 self.client = None
-
-    # =====================================================
-    # GET GEMINI CLIENT
-    # =====================================================
 
     def _get_client(self):
         """
-        Return the Gemini client.
+        Return the existing Gemini client.
 
-        If the client was not initialized earlier, try to
-        initialize it again.
+        If the client is not available, try to create it again.
         """
 
         if self.client is not None:
             return self.client
 
         if not self.api_key:
+            print("GEMINI API KEY IS NOT CONFIGURED.")
             return None
 
         try:
-            self.client = genai.Client(api_key=self.api_key)
+            self.client = genai.Client(
+                api_key=self.api_key,
+                http_options=types.HttpOptions(
+                    timeout=self.GEMINI_TIMEOUT_MS,
+                ),
+            )
             return self.client
 
         except Exception as error:
-            print("GEMINI CLIENT INITIALIZATION ERROR:", str(error))
+            print(
+                "GEMINI CLIENT INITIALIZATION ERROR:",
+                str(error),
+            )
             return None
-
-    # =====================================================
-    # GEMINI ERROR HELPERS
-    # =====================================================
 
     def _is_daily_quota_error(self, error_message):
         """
-        Detect Gemini daily free-tier quota exhaustion.
-
-        Daily quota errors should not be repeatedly retried.
+        Detect Gemini daily/free-tier quota errors.
         """
 
         daily_quota_indicators = [
@@ -80,8 +91,7 @@ class LLMService:
 
     def _is_temporary_error(self, error_message):
         """
-        Detect temporary Gemini service errors that can
-        reasonably be retried once.
+        Detect temporary Gemini/network availability errors.
         """
 
         temporary_error_indicators = [
@@ -90,30 +100,31 @@ class LLMService:
             "service unavailable",
             "high demand",
             "temporarily unavailable",
+            "timeout",
+            "timed out",
+            "readtimeout",
+            "connecttimeout",
+            "connect error",
+            "connection reset",
+            "server disconnected",
         ]
 
         return any(
             indicator in error_message for indicator in temporary_error_indicators
         )
 
-    # =====================================================
-    # GENERATE GEMINI RESPONSE
-    # =====================================================
-
     def _generate_response(self, prompt):
         """
         Generate a text response using Gemini.
 
-        Gemini failures are handled safely so that the web
-        request does not crash when Gemini is unavailable.
-
         Behavior:
 
         - Successful Gemini request -> return Gemini response.
-        - Daily quota error -> stop immediately.
-        - Temporary error -> retry once.
-        - Final Gemini failure -> return None so the
-          application can use its fallback response.
+        - Daily quota error -> stop immediately and use fallback.
+        - Temporary/network error -> retry once.
+        - Final Gemini failure -> return None.
+        - Returning None allows the orchestrator to use its
+          verified application fallback response.
         """
 
         client = self._get_client()
@@ -136,7 +147,11 @@ class LLMService:
                     print("GEMINI RETURNED EMPTY RESPONSE.")
                     return None
 
-                response_text = getattr(response, "text", None)
+                response_text = getattr(
+                    response,
+                    "text",
+                    None,
+                )
 
                 if not response_text:
                     print("GEMINI RETURNED NO TEXT RESPONSE.")
@@ -147,49 +162,39 @@ class LLMService:
             except Exception as error:
                 error_message = str(error).lower()
 
-                # =================================================
-                # DAILY QUOTA EXHAUSTED
-                # =================================================
+                print(
+                    f"GEMINI ERROR ON ATTEMPT {attempt + 1}:",
+                    str(error),
+                )
 
+                # Daily quota errors should not be retried.
                 if self._is_daily_quota_error(error_message):
                     print(
                         "GEMINI DAILY QUOTA EXHAUSTED. "
-                        "Using application fallback response."
+                        "USING APPLICATION FALLBACK RESPONSE."
                     )
                     return None
 
-                # =================================================
-                # TEMPORARY GEMINI ERROR
-                # =================================================
-
+                # Retry temporary/network failures only once.
                 if self._is_temporary_error(error_message) and attempt < max_retries:
                     print(
-                        "GEMINI TEMPORARY ERROR. "
+                        "GEMINI TEMPORARY OR NETWORK ERROR. "
                         f"Retrying once in {retry_delay} seconds..."
                     )
 
                     time.sleep(retry_delay)
                     continue
 
-                # =================================================
-                # FINAL GEMINI FAILURE
-                # =================================================
-
-                print("GEMINI RESPONSE ERROR:", str(error))
-                print("USING APPLICATION FALLBACK RESPONSE.")
+                # Final failure.
+                print("GEMINI RESPONSE FAILED. " "USING APPLICATION FALLBACK RESPONSE.")
 
                 return None
 
         return None
 
-    # =====================================================
-    # RAG RESPONSE
-    # =====================================================
-
     def generate_answer(self, question, context):
         """
-        Generate an answer using the user's question
-        and retrieved company knowledge.
+        Generate a natural-language answer using company knowledge.
         """
 
         prompt = f"""
@@ -216,10 +221,6 @@ Provide a clear and useful answer.
 
         return self._generate_response(prompt)
 
-    # =====================================================
-    # NATURAL CHAT RESPONSE
-    # =====================================================
-
     def generate_chat_response(
         self,
         question,
@@ -227,12 +228,10 @@ Provide a clear and useful answer.
         conversation_context="",
     ):
         """
-        Convert structured multi-agent results into
-        a natural, conversational AI response.
+        Generate the final conversational response
+        using the authorized agent results.
         """
 
-        # Convert agent results into readable JSON so that
-        # Gemini receives structured and reliable information.
         agent_results_text = json.dumps(
             agent_results,
             indent=2,
