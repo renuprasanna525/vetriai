@@ -63,9 +63,7 @@ class LLMService:
         """
         Detect Gemini daily free-tier quota exhaustion.
 
-        This should NOT be retried repeatedly because the
-        quota is a daily limit rather than a temporary
-        service-availability problem.
+        Daily quota errors should not be repeatedly retried.
         """
 
         daily_quota_indicators = [
@@ -82,8 +80,8 @@ class LLMService:
 
     def _is_temporary_error(self, error_message):
         """
-        Detect temporary Gemini service/rate-limit errors
-        that are reasonable to retry.
+        Detect temporary Gemini service errors that can
+        reasonably be retried once.
         """
 
         temporary_error_indicators = [
@@ -106,26 +104,26 @@ class LLMService:
         """
         Generate a text response using Gemini.
 
+        Gemini failures are handled safely so that the web
+        request does not crash when Gemini is unavailable.
+
         Behavior:
 
-        - Daily free-tier quota exhaustion:
-          Do NOT repeatedly retry.
-
-        - Temporary 503/service-unavailable errors:
-          Retry up to 3 total attempts.
-
-        - Other errors:
-          Raise the original error so the existing
-          application fallback/error handling can handle it.
+        - Successful Gemini request -> return Gemini response.
+        - Daily quota error -> stop immediately.
+        - Temporary error -> retry once.
+        - Final Gemini failure -> return None so the
+          application can use its fallback response.
         """
 
         client = self._get_client()
 
         if client is None:
-            raise RuntimeError("Gemini API is not available.")
+            print("GEMINI API IS NOT AVAILABLE.")
+            return None
 
-        max_retries = 2
-        retry_delays = [2, 4]
+        max_retries = 1
+        retry_delay = 2
 
         for attempt in range(max_retries + 1):
             try:
@@ -135,12 +133,14 @@ class LLMService:
                 )
 
                 if not response:
-                    raise RuntimeError("Gemini returned an empty response.")
+                    print("GEMINI RETURNED EMPTY RESPONSE.")
+                    return None
 
                 response_text = getattr(response, "text", None)
 
                 if not response_text:
-                    raise RuntimeError("Gemini returned no text response.")
+                    print("GEMINI RETURNED NO TEXT RESPONSE.")
+                    return None
 
                 return response_text.strip()
 
@@ -154,36 +154,33 @@ class LLMService:
                 if self._is_daily_quota_error(error_message):
                     print(
                         "GEMINI DAILY QUOTA EXHAUSTED. "
-                        "No additional retry will be attempted."
+                        "Using application fallback response."
                     )
-
-                    raise RuntimeError(
-                        "Gemini daily API quota has been exhausted. "
-                        "Please try again after the quota resets."
-                    ) from error
+                    return None
 
                 # =================================================
-                # TEMPORARY GEMINI SERVICE ERROR
+                # TEMPORARY GEMINI ERROR
                 # =================================================
 
                 if self._is_temporary_error(error_message) and attempt < max_retries:
-                    delay = retry_delays[attempt]
-
                     print(
-                        f"GEMINI TEMPORARY ERROR "
-                        f"(attempt {attempt + 1}/{max_retries + 1}). "
-                        f"Retrying in {delay} seconds..."
+                        "GEMINI TEMPORARY ERROR. "
+                        f"Retrying once in {retry_delay} seconds..."
                     )
 
-                    time.sleep(delay)
+                    time.sleep(retry_delay)
                     continue
 
                 # =================================================
-                # OTHER GEMINI ERRORS
+                # FINAL GEMINI FAILURE
                 # =================================================
 
                 print("GEMINI RESPONSE ERROR:", str(error))
-                raise
+                print("USING APPLICATION FALLBACK RESPONSE.")
+
+                return None
+
+        return None
 
     # =====================================================
     # RAG RESPONSE
