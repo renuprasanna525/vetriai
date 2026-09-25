@@ -590,11 +590,14 @@ class AgentRegistry:
             "crm status",
             "crm summary",
             "crm overview",
+            "customer",
+            "customers",
             "customer relationship",
             "customer relationships",
             "customer management",
             "customer records",
             "customer database",
+            "customer information",
         ]
 
         crm_score = sum(1 for keyword in crm_keywords if keyword in request_lower)
