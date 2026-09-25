@@ -913,31 +913,61 @@ class AIOrchestrator:
     # =========================================================
     # PERMISSION HELPER
     # =========================================================
-
     def check_agent_permission(
         self,
         user,
         agent_name,
     ):
+        """
+        Check whether the current user's role is allowed
+        to access the requested agent.
+        """
+
+        # Get the user's role from UserProfile
+        role = None
+
         try:
-            return self.permission_engine.can_access(
-                user,
-                agent_name,
-            )
-
-        except TypeError:
-
-            try:
-                return self.permission_engine.can_access(
-                    user=user,
-                    agent=agent_name,
-                )
-
-            except Exception:
-                return True
-
+            if hasattr(user, "userprofile"):
+                role = user.userprofile.role
         except Exception:
-            return True
+            role = None
+
+        # Safety fallback for projects where role may be
+        # attached directly to the user object.
+        if not role:
+            role = getattr(user, "role", None)
+
+        if not role:
+            return False
+
+        # Agent -> Permission mapping
+        agent_permissions = {
+            "Finance Agent": "view_finance",
+            "Sales Agent": "view_sales",
+            "Project Agent": "view_projects",
+            "HR Agent": "view_employees",
+            "Marketing Agent": "view_marketing",
+            "Developer Agent": "view_developer",
+            "QA Agent": "view_qa",
+            "Operations Agent": "view_operations",
+            "Customer Support Agent": "view_customer_support",
+            "GitHub Agent": "view_github",
+            "Cloud Storage Agent": "view_cloud_storage",
+        }
+
+        permission = agent_permissions.get(agent_name)
+
+        # Unknown agents are denied instead of being allowed
+        # accidentally.
+        if not permission:
+            return False
+
+        result = self.permission_engine.check_permission(
+            role,
+            permission,
+        )
+
+        return result.get("allowed", False)
 
     # =========================================================
     # AGENT EXECUTION HELPER
