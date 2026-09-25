@@ -927,7 +927,7 @@ class AIOrchestrator:
         role = None
 
         try:
-            if hasattr(user, "userprofile"):
+            if hasattr(user, "profile"):
                 role = user.profile.role
         except Exception:
             role = None
@@ -2391,44 +2391,99 @@ class AIOrchestrator:
         # =====================================================
         # 3. AGENT SELECTION
         # =====================================================
-        # Known entities must take priority over generic keyword
-        # matching. This prevents requests such as
-        # "What is the status of Payment Integration?" from
-        # being incorrectly routed to HR because of a keyword
-        # score elsewhere in the registry.
+        #
+        # Priority:
+        #
+        # 1. Explicit agent/topic in CURRENT user request
+        # 2. Explicit entity in CURRENT user request
+        # 3. Previous conversation/entity context only when
+        #    the current request is ambiguous
+        #
+        # This prevents a previous project such as
+        # "Vetri E-Commerce" from overriding a new request
+        # such as "Show me the sales information."
+        # -----------------------------------------------------
+        # 3A. Detect agents directly from CURRENT request
+        # -----------------------------------------------------
+
+        current_request_agents = self.get_agents_from_request(request)
+        print(
+            "CURRENT REQUEST AGENTS:",
+            [agent.name for agent in current_request_agents],
+        )
+
+        # -----------------------------------------------------
+        # 3B. Detect entities from current/conversation context
+        # -----------------------------------------------------
 
         entity_context = self.get_entity_context_from_conversation(
             request=request,
             conversation_history=conversation_history,
         )
 
+        print(
+            "ENTITY CONTEXT:",
+            entity_context,
+        )
+
         entity_agents = self.get_agents_from_entities(entity_context)
 
-        if entity_agents:
-            selected_agents = entity_agents
+        # -----------------------------------------------------
+        # 3C. Current request always wins when it explicitly
+        # identifies a business area.
+        # -----------------------------------------------------
+
+        if current_request_agents:
+
+            selected_agents = current_request_agents
+
             print(
-                "ENTITY-PRIORITY AGENTS:",
+                "ROUTING PRIORITY: CURRENT REQUEST",
+            )
+
+            print(
+                "CURRENT REQUEST AGENTS:",
                 [agent.name for agent in selected_agents],
             )
+
+        # -----------------------------------------------------
+        # 3D. If current request has no direct agent keyword,
+        # use entity-based routing.
+        #
+        # Example:
+        # "What about AI Dashboard?"
+        # -> Project Agent
+        # -----------------------------------------------------
+
+        elif entity_agents:
+
+            selected_agents = entity_agents
+
+            print(
+                "ROUTING PRIORITY: ENTITY CONTEXT",
+            )
+
+            print(
+                "ENTITY-BASED AGENTS:",
+                [agent.name for agent in selected_agents],
+            )
+
+        # -----------------------------------------------------
+        # 3E. Final fallback to registry relevance detection.
+        # -----------------------------------------------------
+
         else:
+
             selected_agents = self.registry.find_relevant_agents(request)
+
+            print(
+                "ROUTING PRIORITY: REGISTRY RELEVANCE",
+            )
 
         print(
             "RELEVANT AGENTS:",
             [agent.name for agent in selected_agents],
         )
-
-        if len(selected_agents) >= 2:
-
-            print("ROUTING: MULTI-AGENT")
-
-            return self.process_multi_agent_query(
-                request=request,
-                user=user,
-                role=role,
-                credentials=credentials,
-                conversation_history=conversation_history,
-            )
 
         # =====================================================
         # 4. SINGLE AGENT QUERY
