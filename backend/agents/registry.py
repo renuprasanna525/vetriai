@@ -396,6 +396,36 @@ class AgentRegistry:
             1 for keyword in finance_keywords if keyword in request_lower
         )
 
+        # =====================================================
+        # Reporting
+        # =====================================================
+
+        reporting_keywords = [
+            "report",
+            "reports",
+            "reporting",
+            "business report",
+            "business reports",
+            "business reporting",
+            "business summary",
+            "business performance",
+            "overall business",
+            "overall business performance",
+            "overall business report",
+            "bo report",
+            "daily report",
+            "generate report",
+            "generate a report",
+            "show report",
+            "show me the report",
+            "report summary",
+            "reporting summary",
+        ]
+
+        reporting_score = sum(
+            1 for keyword in reporting_keywords if keyword in request_lower
+        )
+
         # Revenue is shared between Sales and Finance.
         # Revenue alone belongs to Finance.
         #
@@ -536,6 +566,7 @@ class AgentRegistry:
                 "Marketing Agent",
                 "Customer Support Agent",
                 "Calendar Agent",
+                "Reporting Agent",
             ]
         ]
 
@@ -546,6 +577,7 @@ class AgentRegistry:
         scores = {
             "Sales Agent": sales_score,
             "Finance Agent": finance_score,
+            "Reporting Agent": reporting_score,
             "Project Agent": project_score,
             "GitHub Agent": github_score,
             "Marketing Agent": marketing_score,
