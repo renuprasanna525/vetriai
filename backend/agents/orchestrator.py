@@ -928,14 +928,13 @@ class AIOrchestrator:
 
         try:
             if hasattr(user, "userprofile"):
-                role = user.userprofile.role
+                role = user.profile.role
         except Exception:
             role = None
 
-        # Safety fallback for projects where role may be
-        # attached directly to the user object.
-        if not role:
-            role = getattr(user, "role", None)
+        # Superuser should always use the application admin role
+        if getattr(user, "is_superuser", False):
+            role = "admin"
 
         if not role:
             return False
