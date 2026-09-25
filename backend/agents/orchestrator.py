@@ -1809,22 +1809,24 @@ class AIOrchestrator:
             for result in results
             if isinstance(result, dict)
             and (
-                result.get("status") == "permission_denied"
+                result.get("status") == "denied"
+                or result.get("status") == "permission_denied"
                 or result.get("permission_denied") is True
             )
         ]
 
         if permission_denied_results:
 
-            denied_agent = current_agents[0].name if current_agents else "requested"
+            denied_result = permission_denied_results[0]
 
-            response_message = (
-                f"You do not have permission to access " f"{denied_agent} information."
-            )
+            response_message = denied_result.get(
+                "message",
+                "You do not have permission to access the requested information.",
+           )
 
             print(
                 "PERMISSION DENIED:",
-                denied_agent,
+                denied_result,
             )
 
         else:
