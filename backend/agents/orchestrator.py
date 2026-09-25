@@ -1796,32 +1796,61 @@ class AIOrchestrator:
             results.append(result)
 
         # -----------------------------------------------------
-        # 8. Fallback response
+        # 8. Handle permission-denied results
         # -----------------------------------------------------
 
-        fallback_response = self.build_follow_up_response(
-            request=request,
-            results=results,
-            previous_assistant=previous_assistant,
-            attention_question=is_attention_question,
-        )
+        permission_denied_results = [
+            result
+            for result in results
+            if isinstance(result, dict)
+            and (
+                result.get("status") == "permission_denied"
+                or result.get("permission_denied") is True
+            )
+        ]
+
+        if permission_denied_results:
+
+            denied_agent = current_agents[0].name if current_agents else "requested"
+
+            response_message = (
+                f"You do not have permission to access " f"{denied_agent} information."
+            )
+
+            print(
+                "PERMISSION DENIED:",
+                denied_agent,
+            )
+
+        else:
+
+            # -----------------------------------------------------
+            # 9. Fallback response
+            # -----------------------------------------------------
+
+            fallback_response = self.build_follow_up_response(
+                request=request,
+                results=results,
+                previous_assistant=previous_assistant,
+                attention_question=is_attention_question,
+            )
+
+            # -----------------------------------------------------
+            # 10. Natural response
+            # -----------------------------------------------------
+
+            #
+            # Contextual follow-up responses already have verified
+            # business information and a safe fallback response.
+            #
+            # Do not call Gemini again here. This prevents a temporary
+            # Gemini/network problem from hanging the Render worker.
+            #
+
+            response_message = fallback_response
 
         # -----------------------------------------------------
-        # 9. Natural response
-        # -----------------------------------------------------
-
-        #
-        # Contextual follow-up responses already have verified
-        # business information and a safe fallback response.
-        #
-        # Do not call Gemini again here. This prevents a temporary
-        # Gemini/network problem from hanging the Render worker.
-        #
-
-        response_message = fallback_response
-
-        # -----------------------------------------------------
-        # 10. Audit log
+        # 11. Audit log
         # -----------------------------------------------------
 
         try:
