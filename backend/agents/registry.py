@@ -10,6 +10,7 @@ from .project_agent import ProjectAgent
 from .reporting_agent import ReportingAgent
 from .calendar_agent import CalendarAgent
 from .customer_support_agent import CustomerSupportAgent
+from .crm_agent import CRMAgent
 from .cloud_storage_agent import CloudStorageAgent
 
 
@@ -24,6 +25,7 @@ class AgentRegistry:
             CalendarAgent(),
             HRAgent(),
             SalesAgent(),
+            CRMAgent(),
             ProjectAgent(),
             FinanceAgent(),
             MarketingAgent(),
@@ -266,6 +268,35 @@ class AgentRegistry:
             for agent in self.agents:
 
                 if agent.name == "Cloud Storage Agent":
+
+                    print(
+                        "SELECTED AGENT:",
+                        agent.name,
+                    )
+
+                    return agent
+
+        # -----------------------------------------------------
+        # CRM-specific priority
+        # -----------------------------------------------------
+
+        crm_keywords = [
+            "crm",
+            "crm status",
+            "crm summary",
+            "crm overview",
+            "customer relationship",
+            "customer relationships",
+            "customer management",
+            "customer records",
+            "customer database",
+        ]
+
+        if any(keyword in request_lower for keyword in crm_keywords):
+
+            for agent in self.agents:
+
+                if agent.name == "CRM Agent":
 
                     print(
                         "SELECTED AGENT:",
@@ -551,6 +582,24 @@ class AgentRegistry:
         )
 
         # =====================================================
+        # CRM
+        # =====================================================
+
+        crm_keywords = [
+            "crm",
+            "crm status",
+            "crm summary",
+            "crm overview",
+            "customer relationship",
+            "customer relationships",
+            "customer management",
+            "customer records",
+            "customer database",
+        ]
+
+        crm_score = sum(1 for keyword in crm_keywords if keyword in request_lower)
+
+        # =====================================================
         # Other Agents
         # =====================================================
 
@@ -560,6 +609,7 @@ class AgentRegistry:
             if agent.name
             not in [
                 "Sales Agent",
+                "CRM Agent",
                 "Finance Agent",
                 "Project Agent",
                 "GitHub Agent",
@@ -576,6 +626,7 @@ class AgentRegistry:
 
         scores = {
             "Sales Agent": sales_score,
+            "CRM Agent": crm_score,
             "Finance Agent": finance_score,
             "Reporting Agent": reporting_score,
             "Project Agent": project_score,

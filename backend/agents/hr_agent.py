@@ -178,7 +178,7 @@ class HRAgent(BaseAgent):
                 employees = data.get("employees_on_leave", [])
 
                 if not employees:
-                    message = "There are no employees " "currently on leave."
+                    message = "There are no employees currently on leave."
 
                 else:
                     names = [employee["name"] for employee in employees]
@@ -246,7 +246,7 @@ class HRAgent(BaseAgent):
                 salaries = data.get("salary_information", [])
 
                 if not salaries:
-                    message = "No salary information is " "currently available."
+                    message = "No salary information is currently available."
 
                 else:
                     salary_lines = []
@@ -292,7 +292,7 @@ class HRAgent(BaseAgent):
 
                 if not employees:
 
-                    message = "There are no employees " "available."
+                    message = "There are no employees available."
 
                 else:
 
@@ -302,6 +302,54 @@ class HRAgent(BaseAgent):
                         f"There are {len(employees)} employees: "
                         + ", ".join(employee_names)
                         + "."
+                    )
+
+                return {
+                    "agent": self.name,
+                    "status": "success",
+                    "data": data,
+                    "message": message,
+                }
+
+        # ==========================================
+        # HR Status / Summary
+        # ==========================================
+
+        hr_status_keywords = [
+            "hr status",
+            "hr summary",
+            "current hr status",
+            "current hr summary",
+            "hr overview",
+            "employee status",
+            "employee summary",
+            "employee overview",
+        ]
+
+        if any(keyword in request_lower for keyword in hr_status_keywords):
+
+            result = self.database_tool.execute(
+                "get_employees_on_leave",
+                user,
+            )
+
+            if result.get("status") == "success":
+
+                data = result.get("data", {})
+                employees = data.get("employees_on_leave", [])
+
+                if employees:
+                    names = [employee["name"] for employee in employees]
+
+                    message = (
+                        "HR Summary:\n"
+                        f"Employees currently on leave: {len(employees)}\n"
+                        f"Employees on leave: {', '.join(names)}"
+                    )
+
+                else:
+                    message = (
+                        "HR Summary:\n" "There are currently no employees on leave."
                     )
 
                 return {
