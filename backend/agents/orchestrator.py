@@ -1793,6 +1793,11 @@ class AIOrchestrator:
                 credentials=credentials,
             )
 
+            print(
+                "EXECUTE AGENT RESULT:",
+                result,
+            )
+
             results.append(result)
 
         # -----------------------------------------------------
