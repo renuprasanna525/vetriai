@@ -952,6 +952,7 @@ class AIOrchestrator:
             "Customer Support Agent": "view_customer_support",
             "GitHub Agent": "view_github",
             "Cloud Storage Agent": "view_cloud_storage",
+            "CRM Agent": "view_crm",
         }
 
         permission = agent_permissions.get(agent_name)
