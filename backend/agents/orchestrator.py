@@ -1822,7 +1822,7 @@ class AIOrchestrator:
             response_message = denied_result.get(
                 "message",
                 "You do not have permission to access the requested information.",
-           )
+            )
 
             print(
                 "PERMISSION DENIED:",
@@ -2532,18 +2532,40 @@ class AIOrchestrator:
         )
 
         # =====================================================
-        # 4. SINGLE AGENT QUERY
+        # 4. SINGLE / MULTI-AGENT QUERY
         # =====================================================
 
-        if len(selected_agents) == 1:
+        if len(selected_agents) > 1:
+            print("ROUTING: MULTI-AGENT QUERY")
+            print(
+                "SELECTED MULTI-AGENTS:",
+                [agent.name for agent in selected_agents],
+            )
+            return self.process_multi_agent_query(
+                request=request,
+                user=user,
+                role=role,
+                credentials=credentials,
+                conversation_history=conversation_history,
+            )
+
+        elif len(selected_agents) == 1:
+
             agent = selected_agents[0]
+
             intent_result = {
                 "intent": agent.name,
                 "agent": agent,
             }
+
         else:
-            intent_result = self.understand_intent(request)
-            agent = intent_result["agent"]
+
+            agent = None
+
+            intent_result = {
+                "intent": "unknown",
+                "agent": None,
+            }
 
         print(
             "SINGLE AGENT:",
