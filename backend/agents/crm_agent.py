@@ -44,7 +44,7 @@ class CRMAgent(BaseAgent):
         if "order" in request_lower:
             return "view_orders"
 
-        return "view_sales"
+        return "view_crm"
 
     def process(self, request, user, credentials=None):
 

@@ -44,6 +44,7 @@ class PermissionEngine:
             "view_leads",
             "view_customers",
             "view_orders",
+            "view_crm",
             "view_employees",
             "view_attendance",
             "view_leave",
