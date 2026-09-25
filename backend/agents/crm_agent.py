@@ -20,6 +20,8 @@ class CRMAgent(BaseAgent):
             "crm status",
             "crm summary",
             "crm overview",
+            "customer",
+            "customers",
             "customer relationship",
             "customer relationships",
             "customer management",
