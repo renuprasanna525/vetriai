@@ -13,7 +13,7 @@ class LLMService:
 
     # Gemini network timeout in milliseconds.
     # This prevents the Render worker from waiting indefinitely.
-    GEMINI_TIMEOUT_MS = 30000
+    GEMINI_TIMEOUT_MS = 10000
 
     def __init__(self):
         """
@@ -32,6 +32,9 @@ class LLMService:
                     api_key=self.api_key,
                     http_options=types.HttpOptions(
                         timeout=self.GEMINI_TIMEOUT_MS,
+                        retry_options=types.HttpRetryOptions(
+                            attempts=1,
+                        ),
                     ),
                 )
             except Exception as error:
@@ -60,6 +63,9 @@ class LLMService:
                 api_key=self.api_key,
                 http_options=types.HttpOptions(
                     timeout=self.GEMINI_TIMEOUT_MS,
+                    retry_options=types.HttpRetryOptions(
+                        attempts=1,
+                    ),
                 ),
             )
             return self.client
@@ -86,10 +92,7 @@ class LLMService:
             "rpd",
         ]
 
-        return any(
-            indicator in error_message
-            for indicator in daily_quota_indicators
-        )
+        return any(indicator in error_message for indicator in daily_quota_indicators)
 
     def _is_temporary_error(self, error_message):
         """
@@ -112,8 +115,7 @@ class LLMService:
         ]
 
         return any(
-            indicator in error_message
-            for indicator in temporary_error_indicators
+            indicator in error_message for indicator in temporary_error_indicators
         )
 
     def _generate_response(self, prompt):
@@ -180,10 +182,7 @@ class LLMService:
                 )
 
             else:
-                print(
-                    "GEMINI RESPONSE FAILED. "
-                    "USING APPLICATION FALLBACK RESPONSE."
-                )
+                print("GEMINI RESPONSE FAILED. " "USING APPLICATION FALLBACK RESPONSE.")
 
             return None
 
