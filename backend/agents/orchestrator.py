@@ -1604,61 +1604,71 @@ class AIOrchestrator:
         )
 
         # -----------------------------------------------------
-        # 3. Explicit entity gets priority
+        # 3. Follow-up routing priority
+        # -----------------------------------------------------
+        # Priority:
+        #
+        # 1. Explicit agent/topic in CURRENT request
+        # 2. Entity context when current request is ambiguous
+        # 3. Previous conversation context
         #
         # Example:
-        # "What about AI Dashboard?"
         #
-        # Entity -> Project Agent
+        # "Tell me about Vetri E-Commerce."
+        # "What about sales?"
         #
-        # Do NOT inherit Sales/Finance from old assistant text.
+        # Current request = Sales
+        # Previous entity = Vetri E-Commerce
+        #
+        # Sales must win because the current request explicitly
+        # identifies the Sales area.
         # -----------------------------------------------------
-
         entity_agents = self.get_agents_from_entities(entity_context)
 
-        if entity_agents:
+        print(
+            "ENTITY-BASED AGENTS:",
+            [agent.name for agent in entity_agents],
+        )
 
-            if current_agents:
-
-                # Keep only agents relevant to the entity
-                entity_agent_names = {agent.name for agent in entity_agents}
-
-                filtered_agents = [
-                    agent
-                    for agent in current_agents
-                    if agent.name in entity_agent_names
-                ]
-
-                if filtered_agents:
-                    current_agents = filtered_agents
-
-                else:
-                    current_agents = entity_agents
-
-            else:
-
-                current_agents = entity_agents
+        # -----------------------------------------------------
+        # Current request wins
+        # -----------------------------------------------------
+        if current_agents:
+            print(
+                "FOLLOW-UP ROUTING PRIORITY: CURRENT REQUEST",
+            )
 
             print(
-                "ENTITY-PRIORITY AGENTS:",
+                "SELECTED FOLLOW-UP AGENTS:",
                 [agent.name for agent in current_agents],
             )
 
         # -----------------------------------------------------
-        # 4. Previous USER agent context
+        # If current request is ambiguous, use entity context
         # -----------------------------------------------------
-
-        if not current_agents:
+        elif entity_agents:
+            current_agents = entity_agents
+            print("FOLLOW-UP ROUTING PRIORITY: ENTITY CONTEXT")
+            print(
+                "ENTITY-BASED AGENTS:",
+                [agent.name for agent in current_agents],
+            )
+        # -----------------------------------------------------
+        # Otherwise use previous conversation context
+        # -----------------------------------------------------
+        else:
 
             current_agents = self.get_agents_from_conversation(conversation_history)
 
-        print(
-            "AGENTS AFTER CONVERSATION CONTEXT:",
-            [agent.name for agent in current_agents],
-        )
+            print("FOLLOW-UP ROUTING PRIORITY: CONVERSATION CONTEXT")
+
+            print(
+                "CONVERSATION AGENTS:",
+                [agent.name for agent in current_agents],
+            )
 
         # -----------------------------------------------------
-        # 5. Attention question detection
+        # 4. Attention question detection
         # -----------------------------------------------------
 
         attention_keywords = [
@@ -1682,7 +1692,7 @@ class AIOrchestrator:
         )
 
         # -----------------------------------------------------
-        # 6. Management attention questions
+        # 5. Management attention questions
         # -----------------------------------------------------
 
         if is_attention_question:
@@ -1705,7 +1715,7 @@ class AIOrchestrator:
                 current_agents = management_agents
 
         # -----------------------------------------------------
-        # 7. No agent found
+        # 6. No agent found
         # -----------------------------------------------------
 
         if not current_agents:
@@ -1743,7 +1753,7 @@ class AIOrchestrator:
             }
 
         # -----------------------------------------------------
-        # 8. Execute contextual agents
+        # 7. Execute contextual agents
         # -----------------------------------------------------
 
         results = []
@@ -1786,7 +1796,7 @@ class AIOrchestrator:
             results.append(result)
 
         # -----------------------------------------------------
-        # 9. Fallback response
+        # 8. Fallback response
         # -----------------------------------------------------
 
         fallback_response = self.build_follow_up_response(
@@ -1797,7 +1807,7 @@ class AIOrchestrator:
         )
 
         # -----------------------------------------------------
-        # 10. Natural response
+        # 9. Natural response
         # -----------------------------------------------------
 
         #
@@ -1811,7 +1821,7 @@ class AIOrchestrator:
         response_message = fallback_response
 
         # -----------------------------------------------------
-        # 11. Audit log
+        # 10. Audit log
         # -----------------------------------------------------
 
         try:
