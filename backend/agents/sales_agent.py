@@ -302,27 +302,84 @@ class SalesAgent(BaseAgent):
             or "revenue" in request_lower
         ):
 
-            result = self.crm_tool.execute(
+            # Get leads
+            leads_result = self.crm_tool.execute(
                 "get_leads",
                 user,
             )
+            # Get Pending Follow-ups
+            followups_result = self.crm_tool.execute(
+                "get_pending_followups",
+                user,
+            )
+            # Get Customers
+            customers_result = self.crm_tool.execute(
+                "get_customers",
+                user,
+            )
+            # Get Orders
+            orders_result = self.crm_tool.execute(
+                "get_orders",
+                user,
+            )
 
-            if result.get("status") == "success":
+            leads_data = (
+                leads_result.get("data", {})
+                if leads_result.get("status") == "success"
+                else {}
+            )
 
-                data = result.get("data", {})
+            followups_data = (
+                followups_result.get("data", {})
+                if followups_result.get("status") == "success"
+                else {}
+            )
 
-                message = (
-                    "Current sales information: "
-                    f"{data.get('total_leads', 0)} total leads "
-                    f"and {data.get('new_leads', 0)} new leads."
-                )
+            customers_data = (
+                customers_result.get("data", {})
+                if customers_result.get("status") == "success"
+                else {}
+            )
 
-                return {
-                    "agent": self.name,
-                    "status": "success",
-                    "data": data,
-                    "message": message,
-                }
+            orders_data = (
+                orders_result.get("data", {})
+                if orders_result.get("status") == "success"
+                else {}
+            )
+
+            total_leads = leads_data.get("total_leads", 0)
+            new_leads = leads_data.get("new_leads", 0)
+
+            pending_followups = followups_data.get("pending_followups", [])
+            customers = customers_data.get("customers", [])
+            total_orders = orders_data.get("total_orders", 0)
+            pending_orders = orders_data.get("pending_orders", 0)
+
+            message = (
+                "Current sales summary: "
+                f"{total_leads} total leads, "
+                f"{new_leads} new leads, "
+                f"{len(pending_followups)} pending follow-ups, "
+                f"{len(customers)} customers, "
+                f"{total_orders} total orders, "
+                f"{pending_orders} pending orders."
+            )
+
+            data = {
+                "total_leads": total_leads,
+                "new_leads": new_leads,
+                "pending_followups": pending_followups,
+                "customers": customers,
+                "total_orders": total_orders,
+                "pending_orders": pending_orders,
+            }
+
+            return {
+                "agent": self.name,
+                "status": "success",
+                "data": data,
+                "message": message,
+            }
 
         # ==========================================
         # Unsupported Request
