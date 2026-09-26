@@ -448,7 +448,7 @@ class AIOrchestrator:
         # This keeps deterministic business answers reliable
         # and avoids unnecessary Gemini API usage.
         # =====================================================
-        
+
         if len(successful_results) == 1:
             result = successful_results[0]
 
@@ -1237,6 +1237,127 @@ class AIOrchestrator:
                     "conversation."
                 ),
             )
+
+        # -----------------------------------------------------
+        # Sales-specific contextual follow-up requests
+        # -----------------------------------------------------
+        #
+        # Preserve the specific topic from the CURRENT question.
+        #
+        # Examples:
+        #   "What about the orders?"
+        #       -> order information
+        #
+        #   "What about the leads?"
+        #       -> lead information
+        #
+        #   "What about the follow-ups?"
+        #       -> pending follow-ups
+        #
+        #   "What about the customers?"
+        #       -> customer information
+        #
+        #   "What about sales?"
+        #       -> complete sales summary
+        #
+        # This prevents every Sales follow-up from becoming
+        # a complete sales-summary request.
+        # -----------------------------------------------------
+
+        if agent_name == "Sales Agent":
+
+            request_lower = request.lower()
+
+            if any(
+                keyword in request_lower
+                for keyword in [
+                    "order",
+                    "orders",
+                    "pending order",
+                    "pending orders",
+                ]
+            ):
+                base_request = (
+                    "Retrieve the current order information needed "
+                    "to answer the user's question. Include the "
+                    "total number of orders and the number of "
+                    "pending orders. If available, include relevant "
+                    "order details and statuses. Focus specifically "
+                    "on orders rather than returning the complete "
+                    "sales summary. Do not invent information."
+                )
+
+            elif any(
+                keyword in request_lower
+                for keyword in [
+                    "follow-up",
+                    "follow up",
+                    "followups",
+                    "pending follow-up",
+                    "pending follow-ups",
+                ]
+            ):
+                base_request = (
+                    "Retrieve the current pending sales follow-up "
+                    "information needed to answer the user's question. "
+                    "Include the customers requiring follow-up and "
+                    "how long each follow-up has been pending. "
+                    "Focus specifically on pending follow-ups rather "
+                    "than returning the complete sales summary. "
+                    "Do not invent information."
+                )
+
+            elif any(
+                keyword in request_lower
+                for keyword in [
+                    "lead",
+                    "leads",
+                    "new lead",
+                    "new leads",
+                ]
+            ):
+                base_request = (
+                    "Retrieve the current sales lead information "
+                    "needed to answer the user's question. Include "
+                    "the total number of leads and new leads, along "
+                    "with other available lead details when relevant. "
+                    "Focus specifically on leads rather than returning "
+                    "the complete sales summary. Do not invent information."
+                )
+
+            elif any(
+                keyword in request_lower
+                for keyword in [
+                    "customer",
+                    "customers",
+                ]
+            ):
+                base_request = (
+                    "Retrieve the current customer information "
+                    "needed to answer the user's question. Include "
+                    "the available customer names and relevant "
+                    "customer status information. Focus specifically "
+                    "on customers rather than returning the complete "
+                    "sales summary. Do not invent information."
+                )
+
+            elif any(
+                keyword in request_lower
+                for keyword in [
+                    "sales",
+                    "sale",
+                    "sales status",
+                    "sales summary",
+                    "sales overview",
+                    "current sales",
+                ]
+            ):
+                base_request = (
+                    "Give the current sales summary discussed in "
+                    "the conversation. Include total leads, new "
+                    "leads, pending follow-ups, customers, orders, "
+                    "and other available sales details."
+                )
 
         # -----------------------------------------------------
         # Project task / item-specific requests
