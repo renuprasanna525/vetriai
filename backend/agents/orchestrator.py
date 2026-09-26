@@ -438,6 +438,44 @@ class AIOrchestrator:
                 }
             )
 
+        # =====================================================
+        # NEW: SINGLE-AGENT VERIFIED RESPONSE
+        # =====================================================
+        # The specialized agent has already retrieved and
+        # validated the business information.
+        #
+        # Do not call Gemini again for a single-agent request.
+        # This keeps deterministic business answers reliable
+        # and avoids unnecessary Gemini API usage.
+        # =====================================================
+        
+        if len(successful_results) == 1:
+            result = successful_results[0]
+
+            message = result.get(
+                "message",
+                "",
+            ).strip()
+
+            data = result.get(
+                "data",
+                {},
+            )
+            if message:
+                return message
+
+            if data:
+                return self.format_data_for_response(data)
+
+            return fallback_response
+
+        # =====================================================
+        # EXISTING: MULTI-AGENT NATURAL RESPONSE
+        # =====================================================
+        # Gemini is still used when multiple agents need to
+        # be combined into one conversational response.
+        # =====================================================
+
         try:
             response = self.llm_service.generate_chat_response(
                 question=request,
