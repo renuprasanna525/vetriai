@@ -35,7 +35,10 @@ class SalesAgent(BaseAgent):
 
         request_lower = request.lower()
 
-        return any(keyword in request_lower for keyword in sales_keywords)
+        return any(
+            keyword in request_lower
+            for keyword in sales_keywords
+        )
 
     def get_required_permission(self, request):
 
@@ -58,7 +61,8 @@ class SalesAgent(BaseAgent):
         ]
 
         is_knowledge_question = any(
-            keyword in request_lower for keyword in knowledge_keywords
+            keyword in request_lower
+            for keyword in knowledge_keywords
         )
 
         if is_knowledge_question:
@@ -85,6 +89,34 @@ class SalesAgent(BaseAgent):
 
         request_lower = request.lower()
 
+        # =====================================================
+        # IMPORTANT:
+        # Contextual requests from the Orchestrator can contain
+        # previous user/assistant messages.
+        #
+        # Example:
+        #
+        # Previous assistant message:
+        # Current sales summary...
+        #
+        # Current user question:
+        # What about the orders?
+        #
+        # We must use ONLY the current user question for
+        # Sales intent detection.
+        # =====================================================
+
+        if "current user question:" in request_lower:
+
+            current_question = request_lower.split(
+                "current user question:",
+                1
+            )[1].strip()
+
+        else:
+
+            current_question = request_lower
+
         # ==========================================
         # Knowledge Base / Sales SOP Questions
         # ==========================================
@@ -102,14 +134,18 @@ class SalesAgent(BaseAgent):
         ]
 
         is_knowledge_question = any(
-            keyword in request_lower for keyword in knowledge_keywords
+            keyword in current_question
+            for keyword in knowledge_keywords
         )
 
         if is_knowledge_question:
 
-            knowledge_answer = self.rag.generate_answer(request)
+            knowledge_answer = self.rag.generate_answer(
+                request
+            )
 
             if knowledge_answer:
+
                 return {
                     "agent": self.name,
                     "status": "success",
@@ -123,27 +159,29 @@ class SalesAgent(BaseAgent):
         # General Sales Request
         # ==========================================
         #
-        # This section is intentionally BEFORE the
-        # generic follow-up section.
+        # IMPORTANT:
+        # Use current_question instead of request_lower.
         #
-        # Contextual requests such as:
-        # "Give more detailed information about the
-        # current sales status..."
+        # This prevents previous assistant messages such as:
         #
-        # may contain "pending follow-ups".
-        # They should still return the complete
-        # sales summary instead of only follow-ups.
+        # "Current sales summary..."
+        #
+        # from incorrectly turning:
+        #
+        # "What about the orders?"
+        #
+        # into a complete sales summary.
         # ==========================================
 
         is_general_sales_request = (
-            "sales" in request_lower
-            or "sale" in request_lower
-            or "sales status" in request_lower
-            or "sales summary" in request_lower
-            or "sales overview" in request_lower
-            or "current sales" in request_lower
-            or "sales information" in request_lower
-            or "revenue" in request_lower
+            "sales" in current_question
+            or "sale" in current_question
+            or "sales status" in current_question
+            or "sales summary" in current_question
+            or "sales overview" in current_question
+            or "current sales" in current_question
+            or "sales information" in current_question
+            or "revenue" in current_question
         )
 
         if is_general_sales_request:
@@ -297,9 +335,9 @@ class SalesAgent(BaseAgent):
         # ==========================================
 
         if (
-            "follow-up" in request_lower
-            or "follow up" in request_lower
-            or "followups" in request_lower
+            "follow-up" in current_question
+            or "follow up" in current_question
+            or "followups" in current_question
         ):
 
             result = self.crm_tool.execute(
@@ -309,19 +347,44 @@ class SalesAgent(BaseAgent):
 
             if result.get("status") == "success":
 
-                followups = result.get(
-                    "data",
-                    {},
-                ).get(
-                    "pending_followups",
-                    [],
+                followups = (
+                    result.get("data", {})
+                    .get("pending_followups", [])
                 )
 
                 if not followups:
-                    message = "There are no pending follow-ups."
+
+                    message = (
+                        "There are no pending follow-ups."
+                    )
 
                 else:
-                    message = f"There are {len(followups)} " "pending follow-ups."
+
+                    followup_lines = []
+
+                    for followup in followups:
+
+                        customer = followup.get(
+                            "customer",
+                            "Unknown customer",
+                        )
+
+                        days_pending = followup.get(
+                            "days_pending",
+                            0,
+                        )
+
+                        followup_lines.append(
+                            f"{customer}: "
+                            f"{days_pending} days pending"
+                        )
+
+                    message = (
+                        f"There are currently "
+                        f"{len(followups)} customers "
+                        "requiring follow-up:\n"
+                        + "\n".join(followup_lines)
+                    )
 
                 return {
                     "agent": self.name,
@@ -337,7 +400,7 @@ class SalesAgent(BaseAgent):
         # Leads
         # ==========================================
 
-        if "lead" in request_lower:
+        if "lead" in current_question:
 
             result = self.crm_tool.execute(
                 "get_leads",
@@ -352,9 +415,11 @@ class SalesAgent(BaseAgent):
                 )
 
                 message = (
-                    f"There are {data.get('total_leads', 0)} "
+                    f"There are "
+                    f"{data.get('total_leads', 0)} "
                     "total leads, including "
-                    f"{data.get('new_leads', 0)} new leads."
+                    f"{data.get('new_leads', 0)} "
+                    "new leads."
                 )
 
                 return {
@@ -368,7 +433,7 @@ class SalesAgent(BaseAgent):
         # Customers
         # ==========================================
 
-        if "customer" in request_lower:
+        if "customer" in current_question:
 
             result = self.crm_tool.execute(
                 "get_customers",
@@ -388,15 +453,24 @@ class SalesAgent(BaseAgent):
                 )
 
                 if not customers:
-                    message = "There are no customers " "in the CRM."
+
+                    message = (
+                        "There are no customers "
+                        "in the CRM."
+                    )
 
                 else:
 
-                    customer_names = [customer["name"] for customer in customers]
+                    customer_names = [
+                        customer["name"]
+                        for customer in customers
+                    ]
 
                     message = (
                         f"There are {len(customers)} "
-                        "customers: " + ", ".join(customer_names) + "."
+                        "customers: "
+                        + ", ".join(customer_names)
+                        + "."
                     )
 
                 return {
@@ -410,13 +484,13 @@ class SalesAgent(BaseAgent):
         # Orders
         # ==========================================
 
-        if "order" in request_lower:
+        if "order" in current_question:
 
             # ------------------------------------------
             # Pending Orders
             # ------------------------------------------
 
-            if "pending" in request_lower:
+            if "pending" in current_question:
 
                 result = self.crm_tool.execute(
                     "get_pending_orders",
@@ -436,7 +510,11 @@ class SalesAgent(BaseAgent):
                     )
 
                     if not orders:
-                        message = "There are no pending " "orders."
+
+                        message = (
+                            "There are no pending "
+                            "orders."
+                        )
 
                     else:
 
@@ -452,7 +530,8 @@ class SalesAgent(BaseAgent):
 
                         message = (
                             f"There are {len(orders)} "
-                            "pending orders:\n" + "\n".join(order_lines)
+                            "pending orders:\n"
+                            + "\n".join(order_lines)
                         )
 
                     return {
@@ -493,7 +572,8 @@ class SalesAgent(BaseAgent):
                     message = (
                         f"There are {total_orders} "
                         "total orders, including "
-                        f"{pending_orders} pending orders."
+                        f"{pending_orders} "
+                        "pending orders."
                     )
 
                     return {
@@ -512,6 +592,7 @@ class SalesAgent(BaseAgent):
             "status": "error",
             "data": {},
             "message": (
-                "The requested sales information " "is not currently supported."
+                "The requested sales information "
+                "is not currently supported."
             ),
         }
