@@ -390,6 +390,56 @@ class AgentRegistry:
         matches = []
 
         # =====================================================
+        # Customer Follow-up Priority
+        # =====================================================
+        #
+        # A question specifically asking which customers need
+        # follow-up belongs to CRM rather than becoming a
+        # duplicate CRM + Sales request.
+        #
+        # Examples:
+        #
+        # "Which customers need follow-up?"
+        #     -> CRM Agent
+        #
+        # "Which customers require follow-up?"
+        #     -> CRM Agent
+        #
+        # "What about follow-ups?"
+        #     -> Sales Agent
+        #
+        # The distinction is important:
+        # customer-specific follow-up -> CRM
+        # general sales follow-up -> Sales
+        # =====================================================
+
+        has_customer_reference = (
+            "customer" in request_lower or "customers" in request_lower
+        )
+        has_followup_reference = (
+            "follow-up" in request_lower
+            or "follow up" in request_lower
+            or "followups" in request_lower
+        )
+
+        if has_customer_reference and has_followup_reference:
+            for agent in self.agents:
+
+                if agent.name == "CRM Agent":
+
+                    print(
+                        "CUSTOMER FOLLOW-UP PRIORITY:",
+                        agent.name,
+                    )
+
+                    print(
+                        "FINAL RELEVANT AGENTS:",
+                        [agent.name],
+                    )
+
+                    return [agent]
+
+        # =====================================================
         # Sales
         # =====================================================
 
