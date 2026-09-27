@@ -472,6 +472,25 @@ class AgentRegistry:
                     return [agent]
 
         # -----------------------------------------------------
+        # Customer Support issue questions
+        # -----------------------------------------------------
+        support_issue_questions = [
+            "how many issues are open",
+            "how many issues are resolved",
+            "issues are open",
+            "issues are resolved",
+        ]
+
+        if any(term in request_lower for term in support_issue_questions):
+            for agent in self.agents:
+                if agent.name == "Customer Support Agent":
+                    print(
+                        "SUPPORT ISSUE QUESTION PRIORITY:",
+                        agent.name,
+                    )
+                    return [agent]
+
+        # -----------------------------------------------------
         # Explicit GitHub issue request
         # -----------------------------------------------------
 
