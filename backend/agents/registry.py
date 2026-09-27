@@ -771,6 +771,8 @@ class AgentRegistry:
             "deployments",
             "deploy",
             "deployed",
+            "bug",
+            "bugs",
             "coding",
             "programming",
             "python",
