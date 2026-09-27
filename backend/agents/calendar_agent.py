@@ -31,7 +31,7 @@ class CalendarAgent(BaseAgent):
 
     def get_required_permission(self, request):
 
-        return None
+        return "view_calendar"
 
     def process(self, request, user, credentials=None):
 

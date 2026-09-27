@@ -6,7 +6,10 @@ class GitHubAgent(BaseAgent):
 
     name = "GitHub Agent"
 
-    description = "Handles GitHub repository and cloud development questions"
+    description = (
+        "Handles GitHub repositories, issues, pull requests, "
+        "Git status, and cloud development questions"
+    )
 
     def __init__(self):
         self.github_tool = GitHubTool()
@@ -30,6 +33,7 @@ class GitHubAgent(BaseAgent):
             "cloud",
             "cloud deployment",
             "deployment",
+            "deploy",
         ]
 
         request_lower = request.lower()
@@ -45,32 +49,116 @@ class GitHubAgent(BaseAgent):
         request_lower = request.lower()
 
         # -----------------------------------------
-        # Repository Status
+        # Get GitHub Repository Data
         # -----------------------------------------
 
-        if (
-            "status" in request_lower
-            or "repository" in request_lower
-            or "repositories" in request_lower
-            or "repo" in request_lower
-            or "github" in request_lower
-        ):
+        result = self.github_tool.execute(
+            "get_repository_status",
+            user,
+        )
 
-            result = self.github_tool.execute(
-                "get_repository_status",
-                user,
+        if result.get("status") == "success":
+
+            data = result.get("data", {})
+
+            repositories = data.get("repositories", 0)
+            open_issues = data.get("open_issues", 0)
+            open_pull_requests = data.get(
+                "open_pull_requests",
+                0,
             )
 
-            if result.get("status") == "success":
+            # -----------------------------------------
+            # Focused: Open Issues
+            # -----------------------------------------
 
-                data = result.get("data", {})
+            if "issue" in request_lower or "issues" in request_lower:
+                message = f"There are {open_issues} open GitHub issues."
 
+                return {
+                    "agent": self.name,
+                    "status": "success",
+                    "data": {"open_issues": open_issues},
+                    "message": message,
+                }
+
+            # -----------------------------------------
+            # Focused: Pull Requests
+            # -----------------------------------------
+
+            if (
+                "pull request" in request_lower
+                or "pull requests" in request_lower
+                or " pr" in f" {request_lower}"
+            ):
+                message = (
+                    f"There are {open_pull_requests} open " f"GitHub pull requests."
+                )
+
+                return {
+                    "agent": self.name,
+                    "status": "success",
+                    "data": {"open_pull_requests": open_pull_requests},
+                    "message": message,
+                }
+
+            # -----------------------------------------
+            # Focused: Repository Count
+            # -----------------------------------------
+
+            if (
+                "repository" in request_lower
+                or "repositories" in request_lower
+                or "repo" in request_lower
+                or "repos" in request_lower
+                or "how many repositories" in request_lower
+            ):
+                message = f"There are {repositories} GitHub repositories."
+
+                return {
+                    "agent": self.name,
+                    "status": "success",
+                    "data": {"repositories": repositories},
+                    "message": message,
+                }
+
+            # -----------------------------------------
+            # Cloud / Deployment Information
+            # -----------------------------------------
+
+            if (
+                "cloud" in request_lower
+                or "deployment" in request_lower
+                or "deploy" in request_lower
+            ):
+                message = (
+                    "Cloud deployment information is "
+                    "currently available as an MVP feature."
+                )
+
+                return {
+                    "agent": self.name,
+                    "status": "success",
+                    "data": {"message": message},
+                    "message": message,
+                }
+
+            # -----------------------------------------
+            # GitHub Repository Summary
+            # -----------------------------------------
+
+            if (
+                "github" in request_lower
+                or "git status" in request_lower
+                or "repository status" in request_lower
+                or "status" in request_lower
+            ):
                 message = (
                     "GitHub Repository Status:\n"
-                    f"Repositories: {data.get('repositories', 0)}\n"
-                    f"Open Issues: {data.get('open_issues', 0)}\n"
+                    f"Repositories: {repositories}\n"
+                    f"Open Issues: {open_issues}\n"
                     f"Open Pull Requests: "
-                    f"{data.get('open_pull_requests', 0)}"
+                    f"{open_pull_requests}"
                 )
 
                 return {
@@ -79,31 +167,6 @@ class GitHubAgent(BaseAgent):
                     "data": data,
                     "message": message,
                 }
-
-        # -----------------------------------------
-        # Cloud / Deployment Information
-        # -----------------------------------------
-
-        if (
-            "cloud" in request_lower
-            or "deployment" in request_lower
-            or "deploy" in request_lower
-        ):
-
-            return {
-                "agent": self.name,
-                "status": "success",
-                "data": {
-                    "message": (
-                        "Cloud deployment information is "
-                        "currently available as an MVP feature."
-                    )
-                },
-                "message": (
-                    "Cloud deployment information is "
-                    "currently available as an MVP feature."
-                ),
-            }
 
         # -----------------------------------------
         # Unsupported Request

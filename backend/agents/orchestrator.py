@@ -991,6 +991,7 @@ class AIOrchestrator:
             "GitHub Agent": "view_github",
             "Cloud Storage Agent": "view_cloud_storage",
             "CRM Agent": "view_crm",
+            "Calendar Agent": "view_calendar",
         }
 
         permission = agent_permissions.get(agent_name)
