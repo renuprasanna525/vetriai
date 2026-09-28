@@ -31,6 +31,10 @@ class QAAgent(BaseAgent):
             "coverage",
             "passed tests",
             "failed tests",
+            "tests passed",
+            "tests failed",
+            "how many tests passed",
+            "how many tests failed",
         ]
 
         request_lower = request.lower()
@@ -64,6 +68,10 @@ class QAAgent(BaseAgent):
             "coverage",
             "passed tests",
             "failed tests",
+            "tests passed",
+            "tests failed",
+            "how many tests passed",
+            "how many tests failed",
         ]
 
         if not any(keyword in request_lower for keyword in qa_keywords):
