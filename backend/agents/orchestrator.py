@@ -982,6 +982,7 @@ class AIOrchestrator:
             "Finance Agent": "view_finance",
             "Sales Agent": "view_sales",
             "Project Agent": "view_projects",
+            "Reporting Agent": "view_reports",
             "HR Agent": "view_employees",
             "Marketing Agent": "view_marketing",
             "Developer Agent": "view_developer",
