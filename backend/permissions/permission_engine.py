@@ -30,6 +30,7 @@ class PermissionEngine:
             "view_projects",
             "view_project_status",
             "view_team",
+            "view_reports",
             "view_github",
             "view_finance",
             "view_marketing",
