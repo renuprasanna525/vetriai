@@ -339,6 +339,10 @@ class AgentRegistry:
             "regression",
             "passed tests",
             "failed tests",
+            "tests passed",
+            "tests failed",
+            "how many tests passed",
+            "how many tests failed",
             "defect",
             "defects",
         ]
@@ -826,6 +830,10 @@ class AgentRegistry:
             "regression",
             "passed tests",
             "failed tests",
+            "tests passed",
+            "tests failed",
+            "how many tests passed",
+            "how many tests failed",
             "defect",
             "defects",
         ]
@@ -846,7 +854,7 @@ class AgentRegistry:
             "tasks are pending",
             "pending tasks",
         ]
-        
+
         if any(term in request_lower for term in operations_pending_task_questions):
             for agent in self.agents:
                 if agent.name == "Operations Agent":
