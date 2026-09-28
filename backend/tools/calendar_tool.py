@@ -19,7 +19,13 @@ class CalendarTool:
                 "message": "Google Calendar is not connected.",
             }
 
-        if action not in ["get_today_events", "get_tomorrow_events"]:
+        supported_actions = [
+            "get_today_events",
+            "get_tomorrow_events",
+            "get_day_after_tomorrow_events",
+        ]
+
+        if action not in supported_actions:
             return {
                 "status": "error",
                 "message": "Calendar action not supported.",
@@ -40,12 +46,11 @@ class CalendarTool:
             from datetime import datetime, timedelta
             from zoneinfo import ZoneInfo
 
-            # Use India Standard Time for calendar date calculations
+            # Use India Standard Time for calendar date calculations.
             india_timezone = ZoneInfo("Asia/Kolkata")
-
             now = datetime.now(india_timezone)
 
-            # Start of today in India
+            # Start of today in India.
             start_of_today = now.replace(
                 hour=0,
                 minute=0,
@@ -54,12 +59,14 @@ class CalendarTool:
             )
 
             if action == "get_today_events":
-                start_time = start_of_today
-                end_time = start_of_today + timedelta(days=1)
-
+                day_offset = 0
+            elif action == "get_tomorrow_events":
+                day_offset = 1
             else:
-                start_time = start_of_today + timedelta(days=1)
-                end_time = start_of_today + timedelta(days=2)
+                day_offset = 2
+
+            start_time = start_of_today + timedelta(days=day_offset)
+            end_time = start_time + timedelta(days=1)
 
             events_result = (
                 service.events()
@@ -76,7 +83,6 @@ class CalendarTool:
             events = []
 
             for event in events_result.get("items", []):
-
                 start = event.get("start", {})
 
                 event_time = start.get(
@@ -103,7 +109,6 @@ class CalendarTool:
             }
 
         except Exception as exc:
-
             return {
                 "status": "error",
                 "message": f"Calendar API error: {str(exc)}",

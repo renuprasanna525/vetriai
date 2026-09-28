@@ -37,21 +37,38 @@ class CalendarAgent(BaseAgent):
 
         request_lower = request.lower()
 
-        # Tomorrow's events
+        # When the orchestrator supplies conversation context,
+        # extract the latest user question for date detection.
+        marker = "current user question:"
+
+        if marker in request_lower:
+            request_lower = request_lower.rsplit(marker, 1)[1].strip()
+
+        # Check "day after tomorrow" before "tomorrow"
+        # because the longer phrase contains "tomorrow".
         if (
+            "day after tomorrow" in request_lower
+            or "day-after-tomorrow" in request_lower
+        ):
+
+            action = "get_day_after_tomorrow_events"
+            day_label = "the day after tomorrow"
+
+        elif (
             "tomorrow" in request_lower
-            or "tomorrow's" in request_lower
             or "tomorrows" in request_lower
+            or "tomorrow's" in request_lower
+            or "next day" in request_lower
         ):
 
             action = "get_tomorrow_events"
             day_label = "tomorrow"
 
-        # Today's events
         elif (
             "today" in request_lower
-            or "today's" in request_lower
             or "todays" in request_lower
+            or "today's" in request_lower
+            or "current day" in request_lower
         ):
 
             action = "get_today_events"
@@ -64,8 +81,9 @@ class CalendarAgent(BaseAgent):
                 "status": "error",
                 "data": {},
                 "message": (
-                    "I can currently help you with "
-                    "today's or tomorrow's Google Calendar events."
+                    "I can currently help you with today's, "
+                    "tomorrow's, or the day after tomorrow's "
+                    "Google Calendar events."
                 ),
             }
 
@@ -81,7 +99,7 @@ class CalendarAgent(BaseAgent):
 
             if not events:
 
-                message = f"You have no calendar events scheduled for {day_label}."
+                message = f"You have no calendar events scheduled " f"for {day_label}."
 
             else:
 
@@ -89,11 +107,21 @@ class CalendarAgent(BaseAgent):
 
                 for event in events:
 
-                    event_lines.append(f"{event['title']} at {event['time']}")
+                    title = event.get(
+                        "title",
+                        "Untitled event",
+                    )
+
+                    event_time = event.get(
+                        "time",
+                        "Time not specified",
+                    )
+
+                    event_lines.append(f"{title} at {event_time}")
 
                 message = (
-                    f"Here are your Google Calendar events for {day_label}:\n"
-                    + "\n".join(event_lines)
+                    f"Here are your Google Calendar events "
+                    f"for {day_label}:\n" + "\n".join(event_lines)
                 )
 
             return {
