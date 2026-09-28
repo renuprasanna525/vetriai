@@ -98,7 +98,11 @@ class CustomerSupportAgent(BaseAgent):
 
         # Focused: Open Issues
 
-        if "open issue" in request_lower or "open issues" in request_lower:
+        if (
+            "open issue" in request_lower
+            or "open issues" in request_lower
+            or "issues are open" in request_lower
+        ):
             message = f"There are {data['open_issues']} open issues."
 
             return {
@@ -110,7 +114,11 @@ class CustomerSupportAgent(BaseAgent):
 
         # Focused: Resolved Issues
 
-        if "resolved issue" in request_lower or "resolved issues" in request_lower:
+        if (
+            "resolved issue" in request_lower
+            or "resolved issues" in request_lower
+            or "issues are resolved" in request_lower
+        ):
             message = f"There are {data['resolved_issues']} resolved issues."
 
             return {
@@ -122,7 +130,11 @@ class CustomerSupportAgent(BaseAgent):
 
         # Focused: Pending Requests
 
-        if "pending request" in request_lower or "pending requests" in request_lower:
+        if (
+            "pending request" in request_lower
+            or "pending requests" in request_lower
+            or "requests are pending" in request_lower
+        ):
             message = f"There are {data['pending_requests']} pending requests."
 
             return {
