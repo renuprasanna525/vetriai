@@ -836,6 +836,26 @@ class AgentRegistry:
         # Operations
         # =====================================================
 
+        # -----------------------------------------------------
+        # Operations pending task priority
+        # -----------------------------------------------------
+
+        operations_pending_task_questions = [
+            "how many tasks are pending",
+            "how many pending tasks",
+            "tasks are pending",
+            "pending tasks",
+        ]
+        
+        if any(term in request_lower for term in operations_pending_task_questions):
+            for agent in self.agents:
+                if agent.name == "Operations Agent":
+                    print(
+                        "OPERATIONS PENDING TASK PRIORITY:",
+                        agent.name,
+                    )
+                    return [agent]
+
         operations_keywords = [
             "operations",
             "operation",
@@ -848,6 +868,8 @@ class AgentRegistry:
             "operations summary",
             "productivity",
             "efficiency",
+            "pending task",
+            "pending tasks",
         ]
 
         operations_score = sum(
