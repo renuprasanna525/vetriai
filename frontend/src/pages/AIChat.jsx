@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import "./AIChat.css";
 import { authFetch } from "../services/authFetch";
 
-const API_BASE_URL = "http://127.0.0.1:8000/api";
+const API_BASE_URL = "https://vetri-ai-backend-i3pw.onrender.com/api";
 const AI_BOT_IMAGE = "/ai-bot.gif";
 const NEW_CHAT_KEY = "vetri_ai_new_chat";
 
