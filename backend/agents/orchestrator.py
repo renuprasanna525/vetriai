@@ -115,6 +115,49 @@ class AIOrchestrator:
 
         return any(keyword in request_lower for keyword in knowledge_keywords)
 
+    def is_confirmation_reply(self, request):
+        """Detect short replies that confirm a previous offer."""
+        normalized = request.lower().strip().rstrip("!.,?")
+
+        confirmations = {
+            "yes",
+            "yes please",
+            "yes, please",
+            "yeah",
+            "yep",
+            "sure",
+            "okay",
+            "ok",
+            "please do",
+            "go ahead",
+            "show me",
+            "show it",
+            "continue",
+            "proceed",
+            "tell me more",
+        }
+
+        return normalized in confirmations
+
+    def is_rejection_reply(self, request):
+        """Detect short replies that reject a previous offer."""
+        normalized = request.lower().strip().rstrip("!.,?")
+
+        rejections = {
+            "no",
+            "no thanks",
+            "no, thanks",
+            "not now",
+            "no need",
+            "that's okay",
+            "that is okay",
+            "don't",
+            "do not",
+            "cancel",
+        }
+
+        return normalized in rejections
+
     def is_follow_up_question(
         self,
         request,
@@ -122,28 +165,6 @@ class AIOrchestrator:
     ):
         """
         Detect questions that depend on previous conversation context.
-
-        In addition to normal follow-up phrases, this method
-        recognizes entity-reference phrases such as:
-
-         - it
-         - its
-         - their
-         - that
-         - this
-         - that project
-         - this project
-         - that one
-         - this one
-         - for it
-         - for that
-         - for this
-         - about it
-         - about that
-         - about this
-
-        These are treated as follow-ups only when an entity
-        exists in the previous conversation.
         """
 
         follow_up_keywords = [
@@ -192,91 +213,67 @@ class AIOrchestrator:
 
         request_lower = request.lower().strip()
 
-        # -----------------------------------------------------
-        # No conversation means there cannot be a follow-up
-        # -----------------------------------------------------
-
         if not conversation_history:
             return False
 
-        # -----------------------------------------------------
-        # Direct follow-up phrase detection
-        # -----------------------------------------------------
-
+        # Direct follow-up phrase detection.
         if any(keyword in request_lower for keyword in follow_up_keywords):
             return True
 
-        # -----------------------------------------------------
-        # Entity-reference follow-up detection
-        # -----------------------------------------------------
-
+        # Entity-reference follow-up detection.
         entity_context = self.get_entity_context_from_conversation(
             request=request,
             conversation_history=conversation_history,
         )
 
-        if entity_context:
-
-            reference_phrases = [
-                "it",
-                "its",
-                "their",
-                "that",
-                "this",
-                "that one",
-                "this one",
-                "that project",
-                "this project",
-                "that customer",
-                "this customer",
-                "that employee",
-                "this employee",
-                "that task",
-                "this task",
-            ]
-
-            # Exact short reference questions
-            if request_lower in reference_phrases:
-                return True
-
-            words = request_lower.split()
-
-            # -------------------------------------------------
-            # Pronoun-based references
-            # -------------------------------------------------
-
-            if "it" in words:
-                return True
-
-            if "its" in words:
-                return True
-
-            if "their" in words:
-                return True
-
-            # -------------------------------------------------
-            # That / this references
-            # -------------------------------------------------
-
-            if "that" in words or "this" in words:
-
-                reference_patterns = [
-                    "that project",
-                    "this project",
-                    "that one",
-                    "this one",
-                    "that customer",
-                    "this customer",
-                    "that employee",
-                    "this employee",
-                    "that task",
-                    "this task",
-                ]
-
-                if any(phrase in request_lower for phrase in reference_patterns):
-                    return True
-
+        if not entity_context:
             return False
+
+        reference_phrases = [
+            "it",
+            "its",
+            "their",
+            "that",
+            "this",
+            "that one",
+            "this one",
+            "that project",
+            "this project",
+            "that customer",
+            "this customer",
+            "that employee",
+            "this employee",
+            "that task",
+            "this task",
+        ]
+
+        if request_lower in reference_phrases:
+            return True
+
+        words = request_lower.split()
+
+        if any(word in words for word in ["it", "its", "their"]):
+            return True
+
+        reference_patterns = [
+            "that project",
+            "this project",
+            "that one",
+            "this one",
+            "that customer",
+            "this customer",
+            "that employee",
+            "this employee",
+            "that task",
+            "this task",
+        ]
+
+        if ("that" in words or "this" in words) and any(
+            phrase in request_lower for phrase in reference_patterns
+        ):
+            return True
+
+        return False
 
     # =========================================================
     # CONVERSATION CONTEXT
@@ -339,6 +336,23 @@ class AIOrchestrator:
 
         return ""
 
+    def assistant_offered_details(self, conversation_history):
+        """Check whether the latest assistant message offered an action."""
+        message = self.get_last_assistant_message(conversation_history).lower()
+
+        offer_phrases = [
+            "would you like to see",
+            "would you like me to show",
+            "would you like more details",
+            "do you want to see",
+            "shall i show",
+            "i can show you",
+            "i can provide more details",
+            "would you like me to retrieve",
+        ]
+
+        return any(phrase in message for phrase in offer_phrases)
+
     def get_previous_user_message(
         self,
         conversation_history,
@@ -376,6 +390,18 @@ class AIOrchestrator:
         """
         Convert verified agent results into a natural,
         conversational AI response.
+
+        The specialized agents remain responsible for
+        retrieving business information.
+
+        The LLM is responsible only for:
+        - understanding the conversation context
+        - organizing verified information
+        - explaining results naturally
+        - producing a ChatGPT-style response
+
+        If the LLM is unavailable, the application
+        fallback response is returned.
         """
 
         conversation_history = conversation_history or []
@@ -391,6 +417,10 @@ class AIOrchestrator:
         error_results = [
             result for result in results if result.get("status") == "error"
         ]
+
+        # =====================================================
+        # NO SUCCESSFUL RESULTS
+        # =====================================================
 
         if not successful_results:
 
@@ -412,7 +442,21 @@ class AIOrchestrator:
 
             return "I could not find enough information to answer " "your question."
 
+        # =====================================================
+        # CONVERSATION CONTEXT
+        # =====================================================
+
         conversation_context = self.format_conversation_context(conversation_history)
+
+        # =====================================================
+        # PREPARE VERIFIED AGENT RESULTS
+        # =====================================================
+        #
+        # Only the useful business result fields are sent
+        # to the LLM.
+        #
+        # Internal implementation details are not required.
+        # =====================================================
 
         natural_results = []
 
@@ -439,41 +483,22 @@ class AIOrchestrator:
             )
 
         # =====================================================
-        # NEW: SINGLE-AGENT VERIFIED RESPONSE
+        # CALL LLM FOR ALL SUCCESSFUL RESPONSES
         # =====================================================
-        # The specialized agent has already retrieved and
-        # validated the business information.
         #
-        # Do not call Gemini again for a single-agent request.
-        # This keeps deterministic business answers reliable
-        # and avoids unnecessary Gemini API usage.
-        # =====================================================
-
-        if len(successful_results) == 1:
-            result = successful_results[0]
-
-            message = result.get(
-                "message",
-                "",
-            ).strip()
-
-            data = result.get(
-                "data",
-                {},
-            )
-            if message:
-                return message
-
-            if data:
-                return self.format_data_for_response(data)
-
-            return fallback_response
-
-        # =====================================================
-        # EXISTING: MULTI-AGENT NATURAL RESPONSE
-        # =====================================================
-        # Gemini is still used when multiple agents need to
-        # be combined into one conversational response.
+        # Previously:
+        #
+        #   single agent -> direct message
+        #   multiple agents -> LLM
+        #
+        # Now:
+        #
+        #   single agent -> LLM
+        #   multiple agents -> LLM
+        #   follow-up -> LLM
+        #   management -> LLM
+        #
+        # This creates one consistent conversational layer.
         # =====================================================
 
         try:
@@ -492,7 +517,50 @@ class AIOrchestrator:
                 str(error),
             )
 
-        return fallback_response
+        # =====================================================
+        # LLM UNAVAILABLE
+        # =====================================================
+        #
+        # The application still returns the verified
+        # fallback response.
+        # =====================================================
+        if fallback_response:
+            return fallback_response
+
+        # =====================================================
+        # FINAL SAFE FALLBACK
+        # =====================================================
+
+        if len(successful_results) == 1:
+
+            result = successful_results[0]
+
+            message = result.get(
+                "message",
+                "",
+            ).strip()
+
+            data = result.get(
+                "data",
+                {},
+            )
+
+            if message:
+                return message
+
+            if data:
+                return self.format_data_for_response(data)
+
+        # =====================================================
+        # MULTI-AGENT FALLBACK
+        # =====================================================
+
+        return self.build_combined_response(
+            request=request,
+            results=results,
+            conversation_history=conversation_history,
+            management=False,
+        )
 
     # =========================================================
     # AGENT CONTEXT DETECTION
@@ -1243,124 +1311,190 @@ class AIOrchestrator:
         # -----------------------------------------------------
         # Sales-specific contextual follow-up requests
         # -----------------------------------------------------
-        #
-        # Preserve the specific topic from the CURRENT question.
-        #
-        # Examples:
-        #   "What about the orders?"
-        #       -> order information
-        #
-        #   "What about the leads?"
-        #       -> lead information
-        #
-        #   "What about the follow-ups?"
-        #       -> pending follow-ups
-        #
-        #   "What about the customers?"
-        #       -> customer information
-        #
-        #   "What about sales?"
-        #       -> complete sales summary
-        #
-        # This prevents every Sales follow-up from becoming
-        # a complete sales-summary request.
-        # -----------------------------------------------------
 
         if agent_name == "Sales Agent":
 
-            request_lower = request.lower()
+            # Extract the actual current question when the request
+            # already contains the contextual prompt.
+            current_question = request
 
-            if any(
-                keyword in request_lower
-                for keyword in [
-                    "order",
-                    "orders",
-                    "pending order",
-                    "pending orders",
+            if "CURRENT USER QUESTION:" in request:
+                current_question = request.rsplit("CURRENT USER QUESTION:", 1)[
+                    1
+                ].strip()
+
+            current_question_lower = current_question.lower()
+            previous_user_lower = previous_user.lower()
+
+            # Detect vague follow-ups from the current question only.
+            is_vague_detail_followup = any(
+                phrase in current_question_lower
+                for phrase in [
+                    "tell me more",
+                    "more details",
+                    "more information",
+                    "explain more",
+                    "describe them",
+                    "who are they",
+                    "which ones",
                 ]
-            ):
-                base_request = (
-                    "Retrieve the current order information needed "
-                    "to answer the user's question. Include the "
-                    "total number of orders and the number of "
-                    "pending orders. If available, include relevant "
-                    "order details and statuses. Focus specifically "
-                    "on orders rather than returning the complete "
-                    "sales summary. Do not invent information."
-                )
+            )
 
-            elif any(
-                keyword in request_lower
-                for keyword in [
-                    "follow-up",
-                    "follow up",
-                    "followups",
-                    "pending follow-up",
-                    "pending follow-ups",
-                ]
-            ):
-                base_request = (
-                    "Retrieve the current pending sales follow-up "
-                    "information needed to answer the user's question. "
-                    "Include the customers requiring follow-up and "
-                    "how long each follow-up has been pending. "
-                    "Focus specifically on pending follow-ups rather "
-                    "than returning the complete sales summary. "
-                    "Do not invent information."
-                )
+            if is_vague_detail_followup:
 
-            elif any(
-                keyword in request_lower
-                for keyword in [
-                    "lead",
-                    "leads",
-                    "new lead",
-                    "new leads",
-                ]
-            ):
-                base_request = (
-                    "Retrieve the current sales lead information "
-                    "needed to answer the user's question. Include "
-                    "the total number of leads and new leads, along "
-                    "with other available lead details when relevant. "
-                    "Focus specifically on leads rather than returning "
-                    "the complete sales summary. Do not invent information."
-                )
+                # Preserve the specific topic from the previous question.
+                if any(
+                    keyword in previous_user_lower
+                    for keyword in ["new lead", "new leads"]
+                ):
+                    base_request = (
+                        "Retrieve more information specifically about "
+                        "the new leads discussed in the previous question. "
+                        "Include the available new-lead count and any "
+                        "individual lead details returned by the CRM. "
+                        "If individual names or details are unavailable, "
+                        "state that clearly. Do not replace this request "
+                        "with a general sales summary. Do not invent information."
+                    )
 
-            elif any(
-                keyword in request_lower
-                for keyword in [
-                    "customer",
-                    "customers",
-                ]
-            ):
-                base_request = (
-                    "Retrieve the current customer information "
-                    "needed to answer the user's question. Include "
-                    "the available customer names and relevant "
-                    "customer status information. Focus specifically "
-                    "on customers rather than returning the complete "
-                    "sales summary. Do not invent information."
-                )
+                elif any(
+                    keyword in previous_user_lower for keyword in ["lead", "leads"]
+                ):
+                    base_request = (
+                        "Retrieve more information specifically about "
+                        "the leads discussed in the previous question. "
+                        "Include the available total and new-lead counts "
+                        "and any individual lead details returned by the CRM. "
+                        "State clearly if individual details are unavailable. "
+                        "Do not invent information."
+                    )
 
-            elif any(
-                keyword in request_lower
-                for keyword in [
-                    "sales",
-                    "sale",
-                    "sales status",
-                    "sales summary",
-                    "sales overview",
-                    "current sales",
-                ]
-            ):
-                base_request = (
-                    "Give the current sales summary discussed in "
-                    "the conversation. Include total leads, new "
-                    "leads, pending follow-ups, customers, orders, "
-                    "and other available sales details."
-                )
+                elif any(
+                    keyword in previous_user_lower
+                    for keyword in [
+                        "follow-up",
+                        "follow up",
+                        "followups",
+                    ]
+                ):
+                    base_request = (
+                        "Retrieve more information specifically about "
+                        "the pending sales follow-ups discussed previously. "
+                        "Include the customers requiring follow-up and "
+                        "how long each has been pending, when available. "
+                        "Do not invent information."
+                    )
 
+                elif any(
+                    keyword in previous_user_lower for keyword in ["order", "orders"]
+                ):
+                    base_request = (
+                        "Retrieve more information specifically about "
+                        "the orders discussed previously. Include available "
+                        "order counts, statuses, customer names, and amounts. "
+                        "Do not invent information."
+                    )
+
+                elif any(
+                    keyword in previous_user_lower
+                    for keyword in ["customer", "customers"]
+                ):
+                    base_request = (
+                        "Retrieve more information specifically about "
+                        "the customers discussed previously. Include "
+                        "available customer names and status information. "
+                        "Do not invent information."
+                    )
+
+            else:
+                # An explicit topic in the current question takes priority.
+                if any(
+                    keyword in current_question_lower
+                    for keyword in [
+                        "pending order",
+                        "pending orders",
+                        "order",
+                        "orders",
+                    ]
+                ):
+                    base_request = (
+                        "Retrieve the current order information needed "
+                        "to answer the user's question. Include the "
+                        "total number of orders and the number of "
+                        "pending orders. If available, include relevant "
+                        "order details and statuses. Focus specifically "
+                        "on orders rather than returning the complete "
+                        "sales summary. Do not invent information."
+                    )
+
+                elif any(
+                    keyword in current_question_lower
+                    for keyword in [
+                        "follow-up",
+                        "follow up",
+                        "followups",
+                        "pending follow-up",
+                        "pending follow-ups",
+                    ]
+                ):
+                    base_request = (
+                        "Retrieve the current pending sales follow-up "
+                        "information needed to answer the user's question. "
+                        "Include the customers requiring follow-up and "
+                        "how long each follow-up has been pending. "
+                        "Focus specifically on pending follow-ups rather "
+                        "than returning the complete sales summary. "
+                        "Do not invent information."
+                    )
+
+                elif any(
+                    keyword in current_question_lower
+                    for keyword in [
+                        "new lead",
+                        "new leads",
+                        "lead",
+                        "leads",
+                    ]
+                ):
+                    base_request = (
+                        "Retrieve the current sales lead information "
+                        "needed to answer the user's question. Include "
+                        "the total number of leads and new leads, along "
+                        "with other available lead details when relevant. "
+                        "Focus specifically on leads rather than returning "
+                        "the complete sales summary. Do not invent information."
+                    )
+
+                elif any(
+                    keyword in current_question_lower
+                    for keyword in ["customer", "customers"]
+                ):
+                    base_request = (
+                        "Retrieve the current customer information "
+                        "needed to answer the user's question. Include "
+                        "the available customer names and relevant "
+                        "customer status information. Focus specifically "
+                        "on customers rather than returning the complete "
+                        "sales summary. Do not invent information."
+                    )
+
+                elif any(
+                    keyword in current_question_lower
+                    for keyword in [
+                        "sales",
+                        "sale",
+                        "sales status",
+                        "sales summary",
+                        "sales overview",
+                        "current sales",
+                    ]
+                ):
+                    base_request = (
+                        "Give the current sales summary discussed in "
+                        "the conversation. Include total leads, new "
+                        "leads, pending follow-ups, customers, orders, "
+                        "and other available sales details."
+                    )
         # -----------------------------------------------------
         # Project task / item-specific requests
         # -----------------------------------------------------
@@ -1933,6 +2067,25 @@ class AIOrchestrator:
                 attention_question=is_attention_question,
             )
 
+            # Handle a short confirmation such as "yes"
+            if self.is_confirmation_reply(request) and self.assistant_offered_details(
+                conversation_history
+            ):
+                agent_request += (
+                    "\n\nThe user has confirmed the previous "
+                    "assistant's offer to provide more details.\n\n"
+                    f"Previous user request: {previous_user}\n\n"
+                    f"Previous assistant offer: "
+                    f"{previous_assistant}\n\n"
+                    "Retrieve the actual detailed business "
+                    "information needed to fulfill the previous "
+                    "user request. Focus on the same business "
+                    "topic and return the available records, "
+                    "names, statuses, counts, and other relevant "
+                    "details. Do not return only a general summary. "
+                    "Do not invent missing information."
+                )
+
             print(
                 "CONTEXTUAL AGENT:",
                 agent_name,
@@ -2005,18 +2158,20 @@ class AIOrchestrator:
             )
 
             # -----------------------------------------------------
-            # 10. Natural response
+            # 10. Natural conversational response
             # -----------------------------------------------------
-
             #
-            # Contextual follow-up responses already have verified
-            # business information and a safe fallback response.
-            #
-            # Do not call Gemini again here. This prevents a temporary
-            # Gemini/network problem from hanging the Render worker.
-            #
-
-            response_message = fallback_response
+            # The follow-up has already been routed to the
+            # correct agent(s). The verified results are now
+            # passed through the same natural-language layer
+            # used by normal and multi-agent requests.
+            # -----------------------------------------------------
+            response_message = self.generate_natural_response(
+                request=request,
+                results=results,
+                conversation_history=conversation_history,
+                fallback_response=fallback_response,
+            )
 
         # -----------------------------------------------------
         # 11. Audit log
@@ -2537,6 +2692,25 @@ class AIOrchestrator:
 
         conversation_history = conversation_history or []
 
+        # Handle short rejection replies without calling an agent.
+        if (
+            conversation_history
+            and self.is_rejection_reply(request)
+            and self.assistant_offered_details(conversation_history)
+        ):
+            return {
+                "status": "success",
+                "intent": "conversation",
+                "agent": "Vetri AI",
+                "response": (
+                    "No problem. Let me know if you would "
+                    "like to explore those details later."
+                ),
+                "data": {
+                    "conversation_context_used": True,
+                },
+            }
+
         print("=" * 60)
 
         print("AI ORCHESTRATOR REQUEST")
@@ -2565,11 +2739,16 @@ class AIOrchestrator:
         # 1. CONTEXTUAL FOLLOW-UP
         # =====================================================
 
-        if conversation_history and self.is_follow_up_question(
-            request,
-            conversation_history,
+        if conversation_history and (
+            self.is_follow_up_question(
+                request,
+                conversation_history,
+            )
+            or (
+                self.is_confirmation_reply(request)
+                and self.assistant_offered_details(conversation_history)
+            )
         ):
-
             print("ROUTING: CONTEXTUAL FOLLOW-UP")
 
             return self.process_follow_up_query(

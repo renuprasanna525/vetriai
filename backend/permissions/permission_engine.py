@@ -75,7 +75,10 @@ class PermissionEngine:
         Check whether a role has a specific permission.
         """
 
-        permissions = self.ROLE_PERMISSIONS.get(role.lower(), set())
+        permissions = self.ROLE_PERMISSIONS.get(
+            (role or "").lower(),
+            set(),
+        )
 
         return permission in permissions
 

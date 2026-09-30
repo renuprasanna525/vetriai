@@ -1,162 +1,146 @@
 import json
 
 from django.conf import settings
-from google import genai
-from google.genai import types
+from groq import Groq
 
 
 class LLMService:
     """
     Service responsible for generating natural-language
-    answers using the Gemini LLM.
+    responses using the Groq LLM.
+
+    The LLM only explains and organizes verified
+    application data. It must not invent business facts.
     """
 
-    # Gemini network timeout in milliseconds.
-    # This prevents the Render worker from waiting indefinitely.
-    GEMINI_TIMEOUT_MS = 10000
+    GROQ_TIMEOUT_SECONDS = 10.0
 
     def __init__(self):
-        """
-        Initialize the Gemini client safely.
-
-        If the API key is missing or the client cannot be
-        initialized, the application can continue running.
-        """
+        """Initialize the Groq client safely."""
 
         self.client = None
-        self.api_key = getattr(settings, "GEMINI_API_KEY", "")
+
+        self.api_key = getattr(
+            settings,
+            "GROQ_API_KEY",
+            "",
+        )
+
+        self.model = getattr(
+            settings,
+            "GROQ_MODEL",
+            "openai/gpt-oss-120b",
+        )
 
         if self.api_key:
             try:
-                self.client = genai.Client(
+                self.client = Groq(
                     api_key=self.api_key,
-                    http_options=types.HttpOptions(
-                        timeout=self.GEMINI_TIMEOUT_MS,
-                        retry_options=types.HttpRetryOptions(
-                            attempts=1,
-                        ),
-                    ),
+                    timeout=self.GROQ_TIMEOUT_SECONDS,
+                    max_retries=0,
                 )
             except Exception as error:
                 print(
-                    "GEMINI CLIENT INITIALIZATION ERROR:",
+                    "GROQ CLIENT INITIALIZATION ERROR:",
                     str(error),
                 )
                 self.client = None
 
     def _get_client(self):
-        """
-        Return the existing Gemini client.
-
-        If the client is not available, try to create it again.
-        """
+        """Return the existing Groq client or initialize it."""
 
         if self.client is not None:
             return self.client
 
         if not self.api_key:
-            print("GEMINI API KEY IS NOT CONFIGURED.")
+            print("GROQ API KEY IS NOT CONFIGURED.")
             return None
 
         try:
-            self.client = genai.Client(
+            self.client = Groq(
                 api_key=self.api_key,
-                http_options=types.HttpOptions(
-                    timeout=self.GEMINI_TIMEOUT_MS,
-                    retry_options=types.HttpRetryOptions(
-                        attempts=1,
-                    ),
-                ),
+                timeout=self.GROQ_TIMEOUT_SECONDS,
+                max_retries=0,
             )
+
             return self.client
 
         except Exception as error:
             print(
-                "GEMINI CLIENT INITIALIZATION ERROR:",
+                "GROQ CLIENT INITIALIZATION ERROR:",
                 str(error),
             )
             return None
 
     def _is_daily_quota_error(self, error_message):
-        """
-        Detect Gemini daily/free-tier quota errors.
-        """
+        """Detect quota or rate-limit errors."""
 
-        daily_quota_indicators = [
-            "generaterequestsperdayperprojectpermodel-freetier",
-            "generate_content_free_tier_requests",
-            "quota exceeded for metric",
-            "you exceeded your current quota",
+        quota_indicators = [
+            "rate_limit_exceeded",
+            "rate limit",
+            "quota exceeded",
             "quota exhausted",
-            "daily quota",
-            "rpd",
+            "tokens per day",
+            "requests per day",
+            "429",
         ]
 
-        return any(indicator in error_message for indicator in daily_quota_indicators)
+        return any(indicator in error_message for indicator in quota_indicators)
 
     def _is_temporary_error(self, error_message):
-        """
-        Detect Gemini temporary/network availability errors.
-        """
+        """Detect temporary or network availability errors."""
 
-        temporary_error_indicators = [
+        temporary_indicators = [
             "503",
+            "502",
+            "500",
             "unavailable",
-            "service unavailable",
             "high demand",
             "temporarily unavailable",
             "timeout",
             "timed out",
             "readtimeout",
             "connecttimeout",
-            "connect error",
             "connection reset",
             "server disconnected",
+            "service unavailable",
         ]
 
-        return any(
-            indicator in error_message for indicator in temporary_error_indicators
-        )
+        return any(indicator in error_message for indicator in temporary_indicators)
 
     def _generate_response(self, prompt):
         """
-        Generate a text response using Gemini.
+        Generate a response using Groq.
 
-        Behavior:
-
-        - Successful Gemini request -> return Gemini response.
-        - Daily quota error -> return None and use fallback.
-        - Temporary/network error -> return None and use fallback.
-        - Other Gemini failure -> return None and use fallback.
-
-        Returning None allows the orchestrator to use its
-        verified application fallback response.
+        Returns None on failure so the orchestrator
+        can use its application fallback response.
         """
 
         client = self._get_client()
 
         if client is None:
-            print("GEMINI API IS NOT AVAILABLE.")
+            print("GROQ API IS NOT AVAILABLE.")
             return None
 
         try:
-            response = client.models.generate_content(
-                model=settings.GEMINI_MODEL,
-                contents=prompt,
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    }
+                ],
             )
 
-            if not response:
-                print("GEMINI RETURNED EMPTY RESPONSE.")
+            if not response or not response.choices:
+                print("GROQ RETURNED EMPTY RESPONSE.")
                 return None
 
-            response_text = getattr(
-                response,
-                "text",
-                None,
-            )
+            response_text = response.choices[0].message.content
 
             if not response_text:
-                print("GEMINI RETURNED NO TEXT RESPONSE.")
+                print("GROQ RETURNED NO TEXT RESPONSE.")
                 return None
 
             return response_text.strip()
@@ -165,52 +149,56 @@ class LLMService:
             error_message = str(error).lower()
 
             print(
-                "GEMINI RESPONSE ERROR:",
+                "GROQ RESPONSE ERROR:",
                 str(error),
             )
 
             if self._is_daily_quota_error(error_message):
                 print(
-                    "GEMINI DAILY QUOTA EXHAUSTED. "
+                    "GROQ RATE LIMIT OR QUOTA REACHED. "
                     "USING APPLICATION FALLBACK RESPONSE."
                 )
 
             elif self._is_temporary_error(error_message):
                 print(
-                    "GEMINI TEMPORARY OR NETWORK ERROR. "
+                    "GROQ TEMPORARY OR NETWORK ERROR. "
                     "USING APPLICATION FALLBACK RESPONSE."
                 )
 
             else:
-                print("GEMINI RESPONSE FAILED. " "USING APPLICATION FALLBACK RESPONSE.")
+                print("GROQ RESPONSE FAILED. " "USING APPLICATION FALLBACK RESPONSE.")
 
             return None
 
     def generate_answer(self, question, context):
         """
-        Generate a natural-language answer using company knowledge.
+        Generate an answer using company knowledge.
         """
 
         prompt = f"""
-You are a helpful company AI assistant.
+You are Vetri AI, a professional business assistant.
 
-Answer the user's question using ONLY the company
-knowledge provided below.
+Answer the user's question using ONLY the verified
+company knowledge provided below.
 
-If the answer cannot be found in the provided
-company knowledge, say that the information is
-not available in the company knowledge base.
+Rules:
 
-Do not invent facts, numbers, names, or business
-information.
+1. Do not invent facts, numbers, names, dates, or business information.
+2. Do not change any numerical values.
+3. If the requested information is not available, clearly say so.
+4. Answer the user's actual question first.
+5. Use natural, professional language.
+6. Explain the information clearly instead of simply repeating raw data.
+7. Keep the response concise but useful.
+8. Do not mention prompts, models, APIs, or internal implementation.
 
-Company Knowledge:
+VERIFIED COMPANY KNOWLEDGE:
 {context}
 
-User Question:
+USER QUESTION:
 {question}
 
-Provide a clear and useful answer.
+Provide the final answer directly to the user.
 """
 
         return self._generate_response(prompt)
@@ -223,7 +211,7 @@ Provide a clear and useful answer.
     ):
         """
         Generate the final conversational response
-        using the authorized agent results.
+        using verified results returned by authorized agents.
         """
 
         agent_results_text = json.dumps(
@@ -235,50 +223,92 @@ Provide a clear and useful answer.
         prompt = f"""
 You are Vetri AI, a professional business AI assistant.
 
-Your job is to answer the user's question naturally,
-clearly, and conversationally using the verified
-business information returned by the authorized agents.
+Your task is to convert verified business information
+returned by authorized application agents into a natural,
+helpful, ChatGPT-style response.
 
-IMPORTANT RULES:
+The application has already handled:
 
-1. Use ONLY the information provided in the agent results.
-2. Do not invent numbers, facts, names, events, or business information.
-3. Do not change numerical values.
-4. Do not claim that an action was completed unless the agent result says so.
-5. Respect the user's previous conversation context.
-6. If multiple agents provided information, combine the information
-   into one coherent answer.
-7. Do not expose internal agent-processing details unless useful.
-8. Do not say "Agent 1", "Agent 2", etc.
-9. Use natural business language.
-10. Give enough explanation to feel like a real AI assistant.
-11. Avoid extremely short one-line answers when useful details are available.
-12. Do not add information that is not present in the results.
-13. Do not make unsupported judgments such as "good", "bad",
-    "positive", "negative", "strong", "weak", "healthy", or
-    "needs improvement" unless the agent results explicitly
-    support that statement.
-14. You may explain or reorganize the provided information,
-    but do not introduce new business facts.
-15. If an agent provides only summary figures, clearly describe
-    those figures without pretending that additional detailed
-    information is available.
-16. If an agent failed, clearly mention that the information could
-    not be retrieved rather than guessing.
-17. Use headings or bullet points only when they improve readability.
-18. Do not repeatedly use the same follow-up wording.
-19. Keep the answer focused on the user's question.
-20. If the user asks a follow-up question, use the previous conversation
-    context to understand what they are referring to.
-21. Do not mention Gemini, OpenAI, the LLM, prompts, or internal
-    implementation details to the user.
-22. If the available information is limited, clearly state what is
-    available instead of making assumptions.
-23. When several business areas are available, organize the response
-    so that the information is easy to understand.
-24. Prefer complete sentences and short explanations over raw data dumps.
-25. Answer the user's actual question first, then provide supporting
-    details when useful.
+- user authentication
+- permissions
+- agent selection
+- business-data retrieval
+- tool execution
+- authorization
+
+Therefore, your job is NOT to decide permissions,
+invent business information, or perform business operations.
+
+Your job is to explain the verified results naturally.
+
+STRICT DATA RULES:
+
+1. Use ONLY the information contained in AUTHORIZED AGENT RESULTS.
+2. Never invent facts, numbers, names, dates, statuses, tasks,
+   events, customers, projects, leads, or other business information.
+3. Never change numerical values.
+4. Never assume information that is not present.
+5. If information is missing, clearly say that it is not available.
+6. If an agent result contains an error, do not hide the error
+   by inventing an answer.
+7. Never claim that an action was completed unless the result
+   explicitly confirms that it was completed.
+8. Do not create fictional examples and present them as company data.
+
+CONVERSATION RULES:
+
+9. Use the previous conversation to understand references such as:
+   "it", "its", "them", "that project", "that customer",
+   "what about sales", or "tell me more".
+10. Treat the CURRENT USER QUESTION as the main question.
+11. Use previous conversation only to understand context.
+12. Do not repeat the entire previous conversation.
+13. If the current question changes to another business area,
+    answer the new question normally.
+14. If several authorized results are available, combine them
+    into one coherent response.
+15. Do not expose internal routing or processing details.
+
+RESPONSE STYLE:
+
+16. Answer the user's question first.
+17. Use complete natural sentences.
+18. Make the response conversational rather than a raw data dump.
+19. Give useful supporting details when they are available.
+20. Use short paragraphs or bullet points when they improve readability.
+21. Do not make every response follow the same template.
+22. Avoid repeatedly using phrases such as:
+    "Here is the information",
+    "Based on the data",
+    or
+    "Would you like to know more?"
+23. Ask a follow-up question only when it is genuinely useful
+    and the available information supports a meaningful next step.
+24. Do not force a follow-up question after every response.
+25. Do not make unsupported judgments such as:
+    "good", "bad", "strong", "weak", "healthy",
+    "unhealthy", "successful", or "needs improvement"
+    unless the verified results explicitly support that wording.
+26. Do not expose Groq, Gemini, OpenAI, the LLM, prompts,
+    API calls, or internal implementation details.
+27. Do not mention "Agent 1", "Agent 2", or internal agent names
+    unless the user specifically asks how the system works.
+28. Keep the answer focused on the user's request.
+29. If the available information is only a summary,
+    clearly present it as a summary.
+30. If multiple business areas are involved, organize the
+    information so that the relationship between them is clear.
+
+IMPORTANT:
+
+The verified agent results are the source of truth.
+
+Conversation context helps you understand what the user means,
+but conversation context must NOT be treated as new business data.
+
+If the conversation says something previously but the current
+authorized results do not contain that information, do not
+reconstruct or invent the missing business information.
 
 PREVIOUS CONVERSATION:
 {conversation_context}
@@ -289,7 +319,7 @@ CURRENT USER QUESTION:
 AUTHORIZED AGENT RESULTS:
 {agent_results_text}
 
-Now provide the final response to the user.
+Now write the final response that Vetri AI should show to the user.
 """
 
         return self._generate_response(prompt)
