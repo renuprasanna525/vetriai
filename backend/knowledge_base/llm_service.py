@@ -133,6 +133,9 @@ class LLMService:
                 ],
             )
 
+            print("GROQ RESPONSE SUCCESS")
+            print("GROQ MODEL:", self.model)
+
             if not response or not response.choices:
                 print("GROQ RETURNED EMPTY RESPONSE.")
                 return None
