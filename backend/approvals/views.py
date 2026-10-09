@@ -1,8 +1,10 @@
 from rest_framework import status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from permissions.permission_engine import PermissionEngine
 from tools.registry import ToolRegistry
 
 # Single shared registry instance.
@@ -11,17 +13,44 @@ from tools.registry import ToolRegistry
 tool_registry = ToolRegistry()
 
 
-class ApprovalListView(APIView):
-    """
-    Get all approval actions.
+def get_user_role(user):
+    """Return the user's role using the existing project convention."""
+    if user.is_superuser:
+        return "admin"
 
-    Optionally filter to only pending actions using:
-    ?status=pending
-    """
+    return getattr(
+        getattr(user, "profile", None),
+        "role",
+        None,
+    )
+
+
+def require_approval_permission(user, permission):
+    """Enforce an approval permission through PermissionEngine."""
+    role = get_user_role(user)
+    permission_engine = PermissionEngine()
+
+    if not permission_engine.has_permission(role, permission):
+        raise PermissionDenied(
+            "You do not have permission to perform this approval operation."
+        )
+
+
+def is_action_requester(action, user):
+    """Check whether the authenticated user created the action."""
+    return (
+        action.get("requester_id") is not None and action.get("requester_id") == user.pk
+    )
+
+
+class ApprovalListView(APIView):
+    """List approval actions for managers and administrators."""
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        require_approval_permission(request.user, "view_approvals")
+
         actions = list(tool_registry.approval_workflow.pending_actions.values())
 
         status_filter = request.query_params.get("status")
@@ -42,9 +71,7 @@ class ApprovalListView(APIView):
 
 
 class ApprovalPreviewView(APIView):
-    """
-    Create a sensitive action preview requiring human approval.
-    """
+    """Create a sensitive action preview requiring approval."""
 
     permission_classes = [IsAuthenticated]
 
@@ -58,7 +85,7 @@ class ApprovalPreviewView(APIView):
             return Response(
                 {
                     "status": "error",
-                    "message": ("agent_name, tool_name and action are required."),
+                    "message": "agent_name, tool_name and action are required.",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -80,17 +107,20 @@ class ApprovalPreviewView(APIView):
             user=request.user,
         )
 
-        return Response(result, status=status.HTTP_200_OK)
+        return Response(
+            result,
+            status=status.HTTP_200_OK,
+        )
 
 
 class ApprovalDetailView(APIView):
-    """
-    Get the current state of a pending action.
-    """
+    """Get an approval action's state for managers and administrators."""
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request, action_id):
+        require_approval_permission(request.user, "view_approvals")
+
         action = tool_registry.approval_workflow.get_action(action_id)
 
         if action is None:
@@ -112,13 +142,13 @@ class ApprovalDetailView(APIView):
 
 
 class ApprovalApproveView(APIView):
-    """
-    Approve and execute a pending action.
-    """
+    """Approve and execute a pending action as a manager or administrator."""
 
     permission_classes = [IsAuthenticated]
 
     def post(self, request, action_id):
+        require_approval_permission(request.user, "approve_actions")
+
         result = tool_registry.approval_workflow.approve_action(
             action_id=action_id,
             user=request.user,
@@ -129,6 +159,15 @@ class ApprovalApproveView(APIView):
                 result,
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        execution = result.get("execution", {})
+        if execution.get("status") != "success":
+            return Response(
+                {
+                    **result,
+                    "message": "Action was approved, but execution failed.",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         return Response(
             result,
@@ -137,13 +176,25 @@ class ApprovalApproveView(APIView):
 
 
 class ApprovalEditView(APIView):
-    """
-    Edit parameters of a pending action.
-    """
+    """Allow only the original requester to edit their pending action."""
 
     permission_classes = [IsAuthenticated]
 
     def put(self, request, action_id):
+        action = tool_registry.approval_workflow.get_action(action_id)
+
+        if action is None:
+            return Response(
+                {
+                    "status": "error",
+                    "message": "Action not found.",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not is_action_requester(action, request.user):
+            raise PermissionDenied("Only the requester can edit this approval action.")
+
         updated_parameters = request.data.get(
             "parameters",
             {},
@@ -177,13 +228,27 @@ class ApprovalEditView(APIView):
 
 
 class ApprovalCancelView(APIView):
-    """
-    Cancel a pending action.
-    """
+    """Allow only the original requester to cancel their pending action."""
 
     permission_classes = [IsAuthenticated]
 
     def post(self, request, action_id):
+        action = tool_registry.approval_workflow.get_action(action_id)
+
+        if action is None:
+            return Response(
+                {
+                    "status": "error",
+                    "message": "Action not found.",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not is_action_requester(action, request.user):
+            raise PermissionDenied(
+                "Only the requester can cancel this approval action."
+            )
+
         result = tool_registry.approval_workflow.cancel_action(
             action_id=action_id,
             user=request.user,

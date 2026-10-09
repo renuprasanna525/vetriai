@@ -68,6 +68,7 @@ class ApprovalWorkflow:
             "tool": tool_name,
             "action": action,
             "parameters": parameters,
+            "requester_id": getattr(user, "pk", None),
         }
 
         self.pending_actions[action_id] = preview
@@ -140,7 +141,7 @@ class ApprovalWorkflow:
             )
 
             return result
-
+        # Record the approval decision separately from execution.
         action["status"] = "approved"
 
         create_audit_log(
@@ -153,9 +154,27 @@ class ApprovalWorkflow:
             result=f"Action {action_id} approved.",
         )
 
-        # Execute the approved action
-        if self.executor:
-
+        if not self.executor:
+            action["execution_status"] = "failed"
+            action["execution_result"] = {
+                "status": "error",
+                "message": "No executor is configured.",
+            }
+            create_audit_log(
+                user=user or "Unknown",
+                agent=action["agent"],
+                request=action["action"],
+                tool=action["tool"],
+                action=action["action"],
+                approval="Approved - Execution Failed",
+                result=action["execution_result"]["message"],
+            )
+            return {
+                "status": "approved",
+                "action": action,
+                "execution": action["execution_result"],
+            }
+        try:
             execution_result = self.executor(
                 action["agent"],
                 action["tool"],
@@ -163,30 +182,33 @@ class ApprovalWorkflow:
                 action["parameters"],
                 user,
             )
-
-            action["execution_result"] = execution_result
-
-            # Create notification after successful approval and execution
-
-            if user:
-                create_approval_executed_notification(
-                    user=user,
-                    message=(
-                        f"{action['agent']} approved and executed "
-                        f"{action['action']} successfully."
-                    ),
-                    related_id=str(action_id),
-                )
-
-            return {
-                "status": "approved",
-                "action": action,
-                "execution": execution_result,
+            if not isinstance(execution_result, dict):
+                execution_result = {
+                    "status": "error",
+                    "message": "Executor returned an invalid result.",
+                }
+        except Exception:
+            execution_result = {
+                "status": "error",
+                "message": "Approved action execution failed.",
             }
+        action["execution_result"] = execution_result
 
+        succeeded = execution_result.get("status") == "success"
+        action["execution_status"] = "success" if succeeded else "failed"
+        if succeeded and user:
+            create_approval_executed_notification(
+                user=user,
+                message=(
+                    f"{action['agent']} approved and executed "
+                    f"{action['action']} successfully."
+                ),
+                related_id=str(action_id),
+            )
         return {
             "status": "approved",
             "action": action,
+            "execution": execution_result,
         }
 
     def edit_action(self, action_id, updated_parameters, user=None):

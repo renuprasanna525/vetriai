@@ -40,6 +40,8 @@ class PermissionEngine:
             "view_calendar",
             "view_customer_support",
             "view_cloud_storage",
+            "view_approvals",
+            "approve_actions",
         },
         "admin": {
             "view_audit_logs",
@@ -68,6 +70,8 @@ class PermissionEngine:
             "view_own_projects",
             "view_customer_support",
             "view_cloud_storage",
+            "view_approvals",
+            "approve_actions",
         },
     }
 
