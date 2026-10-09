@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     "permissions",
     "agents",
     "knowledge_base",
+    "approvals",
 ]
 
 MIDDLEWARE = [

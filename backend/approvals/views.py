@@ -7,9 +7,8 @@ from rest_framework.views import APIView
 from permissions.permission_engine import PermissionEngine
 from tools.registry import ToolRegistry
 
-# Single shared registry instance.
-# This preserves pending_actions between API requests
-# while the Django process is running.
+# Shared tool registry for approval execution and tool permissions.
+# Approval records are persisted in the database.
 tool_registry = ToolRegistry()
 
 
@@ -51,14 +50,16 @@ class ApprovalListView(APIView):
     def get(self, request):
         require_approval_permission(request.user, "view_approvals")
 
-        actions = list(tool_registry.approval_workflow.pending_actions.values())
+        from approvals.models import ApprovalAction
+
+        queryset = ApprovalAction.objects.all()
 
         status_filter = request.query_params.get("status")
-
         if status_filter:
-            actions = [
-                action for action in actions if action.get("status") == status_filter
-            ]
+            queryset = queryset.filter(status=status_filter)
+
+        workflow = tool_registry.approval_workflow
+        actions = [workflow._serialize_action(record) for record in queryset]
 
         return Response(
             {
