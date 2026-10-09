@@ -77,20 +77,20 @@ class KnowledgeRetriever:
 
     def _has_specific_match(self, query_words, document):
         """
-        Check whether the document contains at least
-        one specific (non-generic) query word.
+        Check whether the document contains a specific query word.
+        For broad policy questions, allow a match when at least
+        two query words appear in the document title or category.
         """
 
         specific_words = {
             word for word in query_words if word not in self.GENERIC_WORDS
         }
 
-        if not specific_words:
-            return False
+        title = document["title"].lower()
+        category = document["category"].lower()
+        content = document["content"].lower()
 
-        document_text = (
-            f"{document['title']} " f"{document['category']} " f"{document['content']}"
-        ).lower()
+        document_text = f"{title} {category} {content}"
 
         document_words = set(
             re.findall(
@@ -99,7 +99,22 @@ class KnowledgeRetriever:
             )
         )
 
-        return bool(specific_words.intersection(document_words))
+        # Normal matching for queries with specific terms.
+        if specific_words:
+            return bool(specific_words.intersection(document_words))
+
+        # Broad queries such as "leave policy":
+        # require at least two query terms to match the title/category.
+        title_category_words = set(
+            re.findall(
+                r"\b[a-zA-Z0-9]+\b",
+                f"{title} {category}",
+            )
+        )
+
+        matching_title_terms = query_words.intersection(title_category_words)
+
+        return len(matching_title_terms) >= 2
 
     def search(self, query, top_k=3):
         """

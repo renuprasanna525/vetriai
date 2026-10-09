@@ -188,15 +188,18 @@ The AI system can route requests to specialized agents including:
 
 * Finance Agent
 * Sales Agent
+* CRM Agent
 * Project Agent
 * Reporting Agent
 * HR Agent
 * Calendar Agent
 * Marketing Agent
 * Developer Agent
+* Customer Support Agent
 * QA Agent
 * Operations Agent
 * GitHub Agent
+* Cloud Storage Agent
 
 ---
 
@@ -313,14 +316,17 @@ The current agent registry includes:
 * Calendar Agent
 * HR Agent
 * Sales Agent
+* CRM Agent
 * Project Agent
 * Finance Agent
 * Marketing Agent
 * Developer Agent
+* Customer Support Agent
 * QA Agent
 * Operations Agent
 * Reporting Agent
 * GitHub Agent
+* Cloud Storage Agent
 
 ---
 
@@ -685,7 +691,9 @@ PUT /api/notifications/1/read/
 GET /api/audit-logs/
 ```
 
-**Authentication:** Currently not enforced by the audit log API view.
+**Authentication:** Required.
+
+**Authorization:** Requires the `view_audit_logs` permission.
 
 **Purpose**
 
@@ -777,6 +785,15 @@ Generates intelligent business alerts based on business conditions such as:
 * Customer issues
 * Other important business conditions
 
+**Example Response**
+
+```json
+{
+    "status": "success",
+    "total_alerts": 0,
+    "message": "0 new intelligent alerts generated."
+}
+```
 ---
 
 # 17. API Endpoint Summary
@@ -807,11 +824,11 @@ Generates intelligent business alerts based on business conditions such as:
 | Notifications          | GET    | Yes            | `/api/notifications/`           |
 | Notification Details   | GET    | Yes            | `/api/notifications/<id>/`      |
 | Mark Notification Read | PUT    | Yes            | `/api/notifications/<id>/read/` |
-| Audit Logs             | GET    | No*            | `/api/audit-logs/`              |
+| Audit Logs             | GET    | Yes            | `/api/audit-logs/`              |
 | Generate Reminders     | POST   | Yes            | `/api/automation/reminders/`    |
 | Generate Alerts        | POST   | Yes            | `/api/automation/alerts/`       |
 
-`*` Authentication is not currently enforced by the corresponding view.
+`*` Authentication is not currently enforced by the corresponding Calendar view.
 
 ---
 
@@ -939,7 +956,7 @@ The API and major project functionality have been tested for:
 
 Approval workflow testing verified the creation of pending approvals, approval execution, notifications, and audit records.
 
-Additional security, unauthorized-access, integration-failure, and AI evaluation testing remain part of the final testing phase.
+Additional integration-failure and AI evaluation testing remain part of the final testing phase.
 
 ---
 

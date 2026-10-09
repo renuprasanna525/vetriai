@@ -8,18 +8,29 @@ class ReportingTool:
     """
     Controlled tool for generating business reports
     by combining existing business tools.
+
+    Daily, weekly, and monthly reports are management
+    snapshots based on the currently available business data.
     """
 
     name = "reporting_tool"
     description = "Generates detailed business reports."
 
+    SUPPORTED_ACTIONS = {
+        "generate_daily_report": "daily",
+        "generate_weekly_report": "weekly",
+        "generate_monthly_report": "monthly",
+    }
+
     def execute(self, action, user=None):
 
-        if action != "generate_daily_report":
+        if action not in self.SUPPORTED_ACTIONS:
             return {
                 "status": "error",
                 "message": "Reporting action not supported.",
             }
+
+        report_period = self.SUPPORTED_ACTIONS[action]
 
         crm_tool = CRMTool()
         project_tool = ProjectTool()
@@ -28,21 +39,49 @@ class ReportingTool:
 
         # Collect data from existing tools
         leads_result = crm_tool.execute("get_leads", user=user)
-        followups_result = crm_tool.execute("get_pending_followups", user=user)
-        customers_result = crm_tool.execute("get_customers", user=user)
-        orders_result = crm_tool.execute("get_orders", user=user)
-        pending_orders_result = crm_tool.execute("get_pending_orders", user=user)
-
-        projects_result = project_tool.execute("get_projects", user=user)
-        project_status_result = project_tool.execute("get_project_status", user=user)
-        delayed_projects_result = project_tool.execute(
-            "get_delayed_projects", user=user
+        followups_result = crm_tool.execute(
+            "get_pending_followups",
+            user=user,
+        )
+        customers_result = crm_tool.execute(
+            "get_customers",
+            user=user,
+        )
+        orders_result = crm_tool.execute(
+            "get_orders",
+            user=user,
+        )
+        pending_orders_result = crm_tool.execute(
+            "get_pending_orders",
+            user=user,
         )
 
-        employees_result = database_tool.execute("get_employees", user=user)
-        leave_result = database_tool.execute("get_employees_on_leave", user=user)
+        projects_result = project_tool.execute(
+            "get_projects",
+            user=user,
+        )
+        project_status_result = project_tool.execute(
+            "get_project_status",
+            user=user,
+        )
+        delayed_projects_result = project_tool.execute(
+            "get_delayed_projects",
+            user=user,
+        )
 
-        finance_result = finance_tool.execute("get_finance_summary", user=user)
+        employees_result = database_tool.execute(
+            "get_employees",
+            user=user,
+        )
+        leave_result = database_tool.execute(
+            "get_employees_on_leave",
+            user=user,
+        )
+
+        finance_result = finance_tool.execute(
+            "get_finance_summary",
+            user=user,
+        )
 
         results = [
             leads_result,
@@ -68,7 +107,10 @@ class ReportingTool:
                 "status": "error",
                 "message": "Unable to collect all business report data.",
                 "errors": [
-                    result.get("message", "Unknown tool error.")
+                    result.get(
+                        "message",
+                        "Unknown tool error.",
+                    )
                     for result in failed_results
                 ],
             }
@@ -90,37 +132,100 @@ class ReportingTool:
 
         # Build combined report
         report = {
+            "report_period": report_period,
+            "report_type": "management_snapshot",
             "finance": {
-                "total_revenue": finance.get("total_revenue", 0),
-                "total_expenses": finance.get("total_expenses", 0),
-                "net_profit": finance.get("net_profit", 0),
+                "total_revenue": finance.get(
+                    "total_revenue",
+                    0,
+                ),
+                "total_expenses": finance.get(
+                    "total_expenses",
+                    0,
+                ),
+                "net_profit": finance.get(
+                    "net_profit",
+                    0,
+                ),
             },
             "sales": {
-                "total_leads": leads.get("total_leads", 0),
-                "new_leads": leads.get("new_leads", 0),
-                "pending_followups": followups.get("pending_followups", []),
-                "total_customers": customers.get("total_customers", 0),
-                "orders": orders.get("orders", []),
-                "total_orders": orders.get("total_orders", 0),
-                "pending_orders": pending_orders.get("pending_orders", 0),
+                "total_leads": leads.get(
+                    "total_leads",
+                    0,
+                ),
+                "new_leads": leads.get(
+                    "new_leads",
+                    0,
+                ),
+                "pending_followups": followups.get(
+                    "pending_followups",
+                    [],
+                ),
+                "total_customers": customers.get(
+                    "total_customers",
+                    0,
+                ),
+                "orders": orders.get(
+                    "orders",
+                    [],
+                ),
+                "total_orders": orders.get(
+                    "total_orders",
+                    0,
+                ),
+                "pending_orders": pending_orders.get(
+                    "pending_orders",
+                    0,
+                ),
             },
             "projects": {
-                "projects": projects.get("projects", []),
-                "total_projects": projects.get("total_projects", 0),
-                "active_projects": project_status.get("active_projects", 0),
-                "completed_projects": project_status.get("completed_projects", 0),
-                "delayed_projects": delayed_projects.get("delayed_projects", []),
-                "total_delayed": delayed_projects.get("total_delayed", 0),
+                "projects": projects.get(
+                    "projects",
+                    [],
+                ),
+                "total_projects": projects.get(
+                    "total_projects",
+                    0,
+                ),
+                "active_projects": project_status.get(
+                    "active_projects",
+                    0,
+                ),
+                "completed_projects": project_status.get(
+                    "completed_projects",
+                    0,
+                ),
+                "delayed_projects": delayed_projects.get(
+                    "delayed_projects",
+                    [],
+                ),
+                "total_delayed": delayed_projects.get(
+                    "total_delayed",
+                    0,
+                ),
             },
             "hr": {
-                "employees": employees.get("employees", []),
-                "total_employees": employees.get("total_employees", 0),
-                "employees_on_leave": leave.get("employees_on_leave", []),
-                "total_on_leave": leave.get("total_on_leave", 0),
+                "employees": employees.get(
+                    "employees",
+                    [],
+                ),
+                "total_employees": employees.get(
+                    "total_employees",
+                    0,
+                ),
+                "employees_on_leave": leave.get(
+                    "employees_on_leave",
+                    [],
+                ),
+                "total_on_leave": leave.get(
+                    "total_on_leave",
+                    0,
+                ),
             },
         }
 
-        # Preserve the original daily-summary fields for compatibility
+        # Preserve the original daily-summary fields
+        # for compatibility with existing ReportingAgent logic.
         report.update(
             {
                 "new_leads": report["sales"]["new_leads"],

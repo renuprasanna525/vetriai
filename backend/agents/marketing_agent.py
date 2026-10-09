@@ -58,7 +58,7 @@ class MarketingAgent(BaseAgent):
         if not any(keyword in request_lower for keyword in marketing_keywords):
             return {
                 "agent": self.name,
-                "status": "error",
+                "status": "unsupported",
                 "data": {},
                 "message": (
                     "The requested marketing information " "is not currently supported."

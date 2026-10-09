@@ -1,8 +1,8 @@
+
 import { authFetch } from "./authFetch";
+import { API_BASE_URL } from "./apiConfig";
 
-const API_BASE_URL =
-    "https://vetri-ai-backend-i3pw.onrender.com/api/approvals";
-
+const APPROVALS_URL = `${API_BASE_URL}/approvals`;
 
 export async function createApprovalPreview({
     agent_name,
@@ -11,7 +11,7 @@ export async function createApprovalPreview({
     parameters = {},
 }) {
     const response = await authFetch(
-        `${API_BASE_URL}/preview/`,
+        `${APPROVALS_URL}/preview/`,
         {
             method: "POST",
             headers: {
@@ -39,14 +39,13 @@ export async function createApprovalPreview({
     return data;
 }
 
-
 export async function getApprovals(status = "") {
     const query = status
         ? `?status=${encodeURIComponent(status)}`
         : "";
 
     const response = await authFetch(
-        `${API_BASE_URL}/${query}`,
+        `${APPROVALS_URL}/${query}`,
         {
             method: "GET",
             headers: {
@@ -68,10 +67,9 @@ export async function getApprovals(status = "") {
     return data;
 }
 
-
 export async function getApproval(actionId) {
     const response = await authFetch(
-        `${API_BASE_URL}/${actionId}/`,
+        `${APPROVALS_URL}/${actionId}/`,
         {
             method: "GET",
             headers: {
@@ -93,10 +91,9 @@ export async function getApproval(actionId) {
     return data;
 }
 
-
 export async function approveAction(actionId) {
     const response = await authFetch(
-        `${API_BASE_URL}/${actionId}/approve/`,
+        `${APPROVALS_URL}/${actionId}/approve/`,
         {
             method: "POST",
             headers: {
@@ -118,13 +115,12 @@ export async function approveAction(actionId) {
     return data;
 }
 
-
 export async function editApproval(
     actionId,
     parameters
 ) {
     const response = await authFetch(
-        `${API_BASE_URL}/${actionId}/edit/`,
+        `${APPROVALS_URL}/${actionId}/edit/`,
         {
             method: "PUT",
             headers: {
@@ -149,10 +145,9 @@ export async function editApproval(
     return data;
 }
 
-
 export async function cancelAction(actionId) {
     const response = await authFetch(
-        `${API_BASE_URL}/${actionId}/cancel/`,
+        `${APPROVALS_URL}/${actionId}/cancel/`,
         {
             method: "POST",
             headers: {

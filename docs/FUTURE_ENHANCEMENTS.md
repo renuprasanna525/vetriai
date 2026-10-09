@@ -2,210 +2,307 @@
 
 ## 1. Introduction
 
-The Vetri AI Multi-Agent platform provides a foundation for AI-assisted business operations using specialized agents, tools, approvals, notifications, automation, knowledge retrieval, and external integrations.
+Vetri AI Multi-Agent is an AI-assisted business operations platform built around specialized agents, centralized orchestration, permissions, tools, approvals, notifications, automation, knowledge retrieval, conversation context, reporting, and selected external integrations.
 
-The following enhancements can be considered for future versions to improve intelligence, security, scalability, reliability, and user experience.
+The current platform already provides a functional foundation for:
+
+* Role-based access and permission enforcement
+* Specialized business agents
+* Agent orchestration and multi-agent collaboration
+* Context-aware conversations and follow-up handling
+* Tool Registry and controlled tool execution
+* Approval workflows for sensitive operations
+* Audit logging
+* Knowledge-base and RAG functionality
+* Groq-based LLM integration
+* Google Calendar integration
+* Email functionality
+* Automated reminders and intelligent alerts
+* Reporting and business briefing capabilities
+* Management priority and attention workflows
+
+Future development should focus on strengthening the existing platform rather than rebuilding already implemented core capabilities.
+
+The following enhancements are intended for future versions and should be implemented according to security, reliability, business value, technical dependencies, and production requirements.
 
 ---
 
-## 2. Implementation Priorities
+## 2. Future Enhancement Priorities
 
-Future enhancements should be implemented in priority order based on security, system stability, business value, and technical dependencies.
-
-### Priority 1 — Security and Reliability
+### Priority 1 — Security, Reliability, and Production Hardening
 
 **Highest priority**
 
-These improvements should be completed before major production expansion.
+Future improvements should focus on strengthening the production platform.
 
-* Protect currently public endpoints where authentication is required.
-* Strengthen role-based and object-level permissions.
-* Improve secret and credential management.
+* Further protect and review API endpoints that require authentication.
+* Strengthen role-based and object-level authorization.
 * Add API rate limiting.
-* Improve input validation.
-* Add stronger error handling and retry mechanisms.
-* Implement comprehensive automated testing.
-* Improve audit-log access control.
-* Add integration health checks.
+* Improve input validation and request sanitization.
+* Strengthen audit-log access control.
+* Expand automated security regression testing.
+* Improve integration health checks.
+* Improve monitoring and operational error reporting.
+* Strengthen production configuration and secret management.
+* Improve backup and recovery procedures.
+* Expand reliability testing for critical workflows.
 
 **Reason:** Security and reliability are foundational requirements for a business operations platform.
 
 ---
 
-### Priority 2 — Core AI and Agent Improvements
+### Priority 2 — AI, LLM, and RAG Improvements
 
 **High priority**
 
-* Improve AI agent routing.
-* Add advanced multi-agent workflows.
-* Improve context sharing between agents.
-* Add structured tool/function calling.
-* Improve natural-language understanding.
-* Improve agent failure recovery.
-* Integrate a production-ready LLM.
-* Improve RAG accuracy and semantic retrieval.
+The platform already has LLM and knowledge-retrieval capabilities. Future work should improve their quality and reliability.
 
-**Reason:** These improvements directly increase the intelligence and usefulness of Vetri AI.
+* Improve LLM response quality and consistency.
+* Improve model evaluation and response benchmarking.
+* Improve LLM fallback and failure handling.
+* Improve token and API cost management.
+* Improve prompt management and validation.
+* Evaluate additional LLM models where appropriate.
+* Improve RAG retrieval accuracy.
+* Improve document relevance ranking.
+* Improve knowledge-source tracking.
+* Improve retrieval evaluation and testing.
+* Improve handling of ambiguous business questions.
+* Improve AI response grounding and factual consistency.
+
+**Reason:** These improvements increase the accuracy, reliability, and usefulness of the existing AI capabilities.
 
 ---
 
-### Priority 3 — Business Integrations
+### Priority 3 — Agent and Workflow Improvements
 
 **High priority**
 
-* Complete CRM integration.
-* Improve project management integration.
-* Expand GitHub integration.
-* Add cloud storage integration.
-* Improve email functionality.
+The current platform already supports specialized agents, orchestration, permissions, tools, approvals, and multi-agent collaboration. Future enhancements should extend these capabilities.
+
+* Improve agent routing accuracy.
+* Improve structured agent-to-agent collaboration.
+* Improve workflow recovery after agent or tool failures.
+* Improve shared context between collaborating agents.
+* Add advanced workflow branching.
+* Improve tool-selection accuracy.
+* Add stronger validation before tool execution.
+* Improve agent performance monitoring.
+* Add advanced agent evaluation.
+* Expand specialized business agents where justified.
+
+**Reason:** The goal is to make existing agent workflows more reliable, explainable, and capable of handling complex business processes.
+
+---
+
+### Priority 4 — Business Integrations and Communication
+
+**Medium-high priority**
+
+Future integration work should extend existing capabilities while keeping integrations isolated through the Tool Registry and permission system.
+
 * Expand Google Calendar functionality.
+* Improve email functionality and reliability.
+* Complete real WhatsApp delivery when required Meta credentials and configuration are available.
+* Improve integration monitoring and failure handling.
+* Add additional supported communication capabilities where required.
+* Support additional external services when there is a clear business requirement.
 
-**Reason:** Integrations allow agents to perform useful business operations using real organizational data.
+The current CRM, project-management, GitHub, cloud-storage, and other business capabilities may continue to use the platform's internal/mock business-data and tool architecture unless live external integrations are specifically required in a future version.
+
+External integrations should not be introduced unnecessarily.
+
+**Reason:** Integrations should provide measurable business value while maintaining security, reliability, and architectural isolation.
 
 ---
 
-### Priority 4 — Automation and Analytics
+### Priority 5 — Automation, Reporting, and Analytics
 
 **Medium priority**
 
-* Expand automated reminders.
-* Improve intelligent alerts.
+The platform already supports automated reminders, intelligent alerts, reporting, management attention workflows, and daily business briefings. Future work can extend these capabilities.
+
 * Add configurable automation rules.
-* Add advanced business analytics.
-* Improve reporting capabilities.
-* Add scheduled reports.
+* Allow administrators to configure automation conditions.
+* Improve reminder and alert prioritization.
 * Add automation monitoring.
+* Add automation execution history and metrics.
+* Improve scheduled reporting.
+* Add advanced business analytics.
+* Add richer management dashboards.
+* Improve business KPI analysis.
+* Expand business intelligence capabilities.
+* Add trend and historical analysis.
 
-**Reason:** Automation and analytics increase operational efficiency after the core platform is stable.
+**Reason:** Advanced automation and analytics can improve operational efficiency after the core platform is stable.
 
 ---
 
-### Priority 5 — Administration and User Experience
+### Priority 6 — Administration and User Experience
 
 **Medium priority**
 
-* Improve administration monitoring.
-* Add system health dashboards.
-* Improve notification preferences.
-* Improve conversation history.
-* Improve AI Chat experience.
-* Add agent/tool execution status.
-* Improve accessibility and mobile responsiveness.
+Future improvements to the administration and user experience may include:
 
-**Reason:** These enhancements improve usability and administration without being prerequisites for the core platform.
+* Improve system health monitoring.
+* Add administration dashboards.
+* Improve notification preferences.
+* Improve conversation search and organization.
+* Improve conversation history management.
+* Improve AI Chat usability.
+* Add user-facing agent/tool execution status where appropriate.
+* Improve error messages and user guidance.
+* Improve accessibility.
+* Improve mobile responsiveness.
+* Improve frontend performance.
+* Improve onboarding and user documentation.
+
+**Reason:** These improvements make the existing platform easier to operate and use without changing its core architecture.
 
 ---
 
-### Priority 6 — Advanced and Long-Term Features
+### Priority 7 — Scalability and Enterprise Capabilities
+
+**Long-term**
+
+For larger deployments, future versions may introduce:
+
+* Database optimization.
+* Caching.
+* Background task processing.
+* Queue infrastructure.
+* Distributed workers.
+* Centralized monitoring.
+* Centralized logging.
+* Automated backups.
+* Load testing.
+* CI/CD improvements.
+* Horizontal scaling.
+* Enterprise deployment architecture.
+* Advanced operational monitoring.
+
+These capabilities should be introduced according to actual production requirements rather than prematurely adding unnecessary infrastructure.
+
+---
+
+### Priority 8 — Advanced and Long-Term Features
 
 **Future / Long-term**
 
-* Mobile or Progressive Web App.
+Potential advanced features include:
+
+* Mobile or Progressive Web App support.
 * Advanced personalization.
-* Enterprise-scale deployment.
-* Distributed background processing.
-* Advanced AI evaluation.
+* Advanced AI evaluation frameworks.
 * Expanded business intelligence.
 * Additional specialized agents.
-* Additional external integrations.
+* Advanced workflow automation.
+* Enterprise-grade monitoring.
+* Additional communication channels.
+* Additional external services where justified.
+* Advanced organizational analytics.
 
-**Reason:** These features are valuable at larger scale but depend on the stability of the core platform.
+These features depend on the stability, security, and scalability of the core platform.
 
 ---
 
 ## 3. Implementation Dependencies
 
-Several future enhancements depend on other components being completed first.
+Future development should respect the dependencies between platform components.
 
 ### 3.1 Security Dependencies
 
-Advanced production deployment depends on:
+Future production hardening depends on:
 
-* Authentication.
-* Role-based permissions.
-* Object-level authorization.
-* Secure environment variables.
-* Protected API endpoints.
-* Audit logging.
-* Input validation.
-* Rate limiting.
+* Authentication
+* Role-based permissions
+* Object-level authorization
+* Protected API endpoints
+* Secure environment variables
+* Audit logging
+* Input validation
+* Rate limiting
+* Security regression testing
 
-Security improvements should be implemented before exposing additional sensitive business operations.
+Sensitive business operations should remain protected by the existing permission and approval mechanisms.
 
 ---
 
 ### 3.2 LLM Dependencies
 
-Advanced AI capabilities depend on:
+Future AI improvements depend on:
 
-* A working production LLM provider.
-* Valid API credentials.
-* Appropriate API billing/quota.
-* Model selection.
-* Token/cost management.
-* Prompt and response validation.
-* Error and timeout handling.
+* A functioning LLM provider
+* Valid API credentials
+* Appropriate model selection
+* API quota and cost management
+* Prompt management
+* Response validation
+* Timeout handling
+* Fallback behavior
+* Performance evaluation
 
-Advanced agent reasoning should not depend entirely on an unavailable external LLM service.
+The existing Groq-based integration provides the current LLM foundation. Future work should improve reliability and evaluation rather than treating LLM integration itself as an unfinished core component.
 
 ---
 
 ### 3.3 RAG Dependencies
 
-Advanced RAG functionality depends on:
+Advanced knowledge retrieval depends on:
 
-* Document ingestion.
-* Document chunking.
-* Embedding generation.
-* Vector or semantic search.
-* Metadata management.
-* Relevance ranking.
-* Source tracking.
+* Document ingestion
+* Document chunking
+* Embedding generation where applicable
+* Semantic retrieval
+* Metadata management
+* Relevance ranking
+* Source tracking
+* Retrieval evaluation
 
-Improved RAG should be implemented after the basic knowledge-base pipeline is stable.
+Future RAG work should improve the existing knowledge-base pipeline rather than replacing the current foundation unnecessarily.
 
 ---
 
 ### 3.4 Multi-Agent Dependencies
 
-Advanced multi-agent workflows depend on:
+Advanced workflows depend on:
 
-* Stable agent registry.
-* Reliable agent routing.
-* Standardized agent interfaces.
-* Permission checks.
-* Tool registry.
-* Shared request context.
-* Error handling.
-* Approval workflow.
+* Agent Registry
+* Reliable agent routing
+* Standardized agent behavior
+* Permission checks
+* Tool Registry
+* Shared request context
+* Error handling
+* Approval workflows
+* Audit logging
 
-Complex multi-agent execution should use the existing permission and approval mechanisms to prevent unauthorized actions.
+Complex agent workflows should continue to use the existing permission and approval mechanisms to prevent unauthorized operations.
 
 ---
 
 ### 3.5 Integration Dependencies
 
-External integrations depend on:
+Integration enhancements may depend on:
 
-* Valid API credentials.
-* OAuth configuration where required.
-* Correct redirect URLs.
-* Network availability.
-* Third-party API availability.
-* API permissions/scopes.
-* Integration-specific error handling.
+* Valid credentials
+* OAuth configuration where required
+* Correct redirect URLs
+* API permissions and scopes
+* Network availability
+* Third-party service availability
+* Integration-specific error handling
+* Secure environment configuration
 
 Examples include:
 
-**Google Calendar → OAuth configuration**
-
-**GitHub → API authentication**
-
-**CRM → CRM API credentials**
-
-**Cloud Storage → Storage API authentication**
+**Google Calendar → OAuth/API configuration**
 
 **Email → Email provider configuration**
+
+**WhatsApp → Meta WhatsApp Cloud API configuration and credentials**
+
+Other business capabilities may continue to use internal/mock implementations unless live external APIs are specifically introduced.
 
 ---
 
@@ -213,12 +310,14 @@ Examples include:
 
 Advanced automation depends on:
 
-* Reliable business data.
-* Agent/tool availability.
-* Scheduler or background task processing.
-* Notification delivery.
-* Configurable business rules.
-* Permission validation.
+* Reliable business data
+* Agent and tool availability
+* Scheduler or background processing
+* Notification delivery
+* Configurable business rules
+* Permission validation
+* Error handling
+* Execution monitoring
 
 Automation should only execute actions using validated data and authorized tools.
 
@@ -228,14 +327,15 @@ Automation should only execute actions using validated data and authorized tools
 
 Advanced analytics depends on:
 
-* Reliable database records.
-* Consistent business data.
-* Audit logs.
-* Agent activity data.
-* Tool execution records.
-* Reporting APIs.
+* Reliable database records
+* Consistent business data
+* Audit logs
+* Agent activity data
+* Tool execution records
+* Reporting APIs
+* Historical data quality
 
-Data quality should be established before building advanced business intelligence features.
+Data quality should be established before introducing advanced business intelligence features.
 
 ---
 
@@ -243,82 +343,85 @@ Data quality should be established before building advanced business intelligenc
 
 Enterprise-scale deployment depends on:
 
-* Production-ready database configuration.
-* Database optimization.
-* Caching.
-* Background task processing.
-* Queue infrastructure.
-* Monitoring.
-* Centralized logging.
-* Automated backups.
-* CI/CD.
-* Load testing.
+* Production-ready database configuration
+* Database optimization
+* Caching
+* Background task processing
+* Queue infrastructure
+* Monitoring
+* Centralized logging
+* Automated backups
+* CI/CD
+* Load testing
 
-Scaling should be performed after the application has stable core functionality and monitoring.
+Scaling should be introduced according to actual production requirements and measured system needs.
 
 ---
 
-## 4. Recommended Implementation Order
+## 4. Recommended Future Implementation Order
 
-The recommended dependency-aware implementation sequence is:
+The recommended dependency-aware sequence is:
 
 ```text
 Security Hardening
-       ↓
+        ↓
 Testing & Reliability
-       ↓
-Production LLM Integration
-       ↓
-RAG Improvements
-       ↓
-Advanced Agent Routing
-       ↓
-Multi-Agent Workflows
-       ↓
-Business Integrations
-       ↓
-Automation Improvements
-       ↓
-Analytics & Reporting
-       ↓
-Admin Monitoring
-       ↓
+        ↓
+Production Monitoring
+        ↓
+LLM Evaluation & Reliability
+        ↓
+RAG Quality Improvements
+        ↓
+Agent & Workflow Improvements
+        ↓
+Integration Reliability
+        ↓
+Automation Enhancements
+        ↓
+Analytics & Business Intelligence
+        ↓
+Administration Improvements
+        ↓
 User Experience Improvements
-       ↓
+        ↓
 Scalability
-       ↓
+        ↓
 Mobile / Advanced Features
 ```
 
-This order minimizes dependency conflicts and reduces the risk of building advanced features on unstable components.
+This sequence builds on the current implemented platform instead of repeating completed development work.
 
 ---
 
 ## 5. Priority and Dependency Matrix
 
-| Enhancement                    | Priority | Main Dependencies                             |
-| ------------------------------ | -------- | --------------------------------------------- |
-| Security hardening             | P1       | Authentication, permissions                   |
-| Automated testing              | P1       | Stable APIs and agents                        |
-| Error recovery                 | P1       | Tool and integration handling                 |
-| Production LLM                 | P2       | API credentials, billing/quota                |
-| RAG improvements               | P2       | Knowledge base, embeddings                    |
-| Advanced agent routing         | P2       | Agent registry, permissions                   |
-| Multi-agent workflows          | P2       | Orchestrator, tools, approvals                |
-| CRM integration                | P3       | CRM API/authentication                        |
-| Project management integration | P3       | External API/authentication                   |
-| GitHub enhancements            | P3       | GitHub API/authentication                     |
-| Cloud storage                  | P3       | Storage API/authentication                    |
-| Email improvements             | P3       | Email provider                                |
-| Calendar improvements          | P3       | Google OAuth/API                              |
-| Automation improvements        | P4       | Scheduler, business data                      |
-| Intelligent alerts             | P4       | Automation and data                           |
-| Advanced analytics             | P4       | Reliable database/reporting data              |
-| Admin monitoring               | P5       | Logs, metrics, APIs                           |
-| UX improvements                | P5       | Stable backend APIs                           |
-| Scalability                    | P6       | Production infrastructure                     |
-| Mobile/PWA                     | P6       | Stable APIs and frontend                      |
-| Advanced personalization       | P6       | Authentication, permissions, user preferences |
+| Enhancement                  | Priority | Main Dependencies                           |
+| ---------------------------- | -------- | ------------------------------------------- |
+| Security hardening           | P1       | Authentication, permissions, protected APIs |
+| API rate limiting            | P1       | API infrastructure                          |
+| Automated security testing   | P1       | Stable APIs and authentication              |
+| Reliability improvements     | P1       | Error handling, monitoring                  |
+| Production monitoring        | P1       | Logging, metrics, deployment infrastructure |
+| LLM evaluation               | P2       | Existing LLM integration, test datasets     |
+| LLM reliability improvements | P2       | Provider configuration, fallback handling   |
+| RAG improvements             | P2       | Knowledge base, retrieval pipeline          |
+| Agent routing improvements   | P2       | Agent Registry, permissions                 |
+| Advanced workflows           | P2       | Orchestrator, tools, approvals              |
+| Integration reliability      | P3       | Credentials, API configuration              |
+| WhatsApp delivery            | P3       | Meta credentials and configuration          |
+| Calendar enhancements        | P3       | Google OAuth/API                            |
+| Email enhancements           | P3       | Email provider configuration                |
+| Automation enhancements      | P4       | Scheduler, business data, permissions       |
+| Advanced analytics           | P4       | Reliable historical/reporting data          |
+| Scheduled reports            | P4       | Reporting and scheduling                    |
+| Admin monitoring             | P5       | Logs, metrics, APIs                         |
+| UX improvements              | P5       | Stable frontend/backend APIs                |
+| Accessibility improvements   | P5       | Frontend                                    |
+| Scalability                  | P6       | Production infrastructure                   |
+| Mobile/PWA                   | P6       | Stable APIs and responsive frontend         |
+| Advanced personalization     | P6       | Authentication, preferences, user context   |
+| Advanced AI evaluation       | P6       | Evaluation datasets and monitoring          |
 
 ---
 
@@ -326,26 +429,31 @@ This order minimizes dependency conflicts and reduces the risk of building advan
 
 The immediate future focus should be:
 
-1. Strengthen security.
-2. Expand automated testing.
-3. Improve error handling.
-4. Stabilize the LLM integration.
-5. Improve RAG retrieval.
-6. Improve multi-agent routing.
-7. Complete remaining business integrations.
+1. Complete security regression and production hardening.
+2. Expand automated and regression testing.
+3. Strengthen API rate limiting and input validation.
+4. Improve production monitoring and integration health checks.
+5. Improve LLM reliability, evaluation, and fallback behavior.
+6. Improve RAG retrieval quality and evaluation.
+7. Strengthen existing agent and multi-agent workflows.
+8. Complete remaining production integration configuration where required.
+9. Complete final production verification and documentation.
 
 ---
 
 ## 7. Medium-Term Roadmap
 
-After the core platform is stable:
+After the current platform is stable:
 
-1. Implement advanced multi-agent workflows.
-2. Expand CRM and project management capabilities.
-3. Improve GitHub, email, calendar, and cloud integrations.
-4. Expand automation and intelligent alerts.
-5. Add advanced reporting and analytics.
-6. Improve administration and monitoring.
+1. Expand configurable automation.
+2. Improve intelligent alert and reminder management.
+3. Add advanced business analytics.
+4. Expand scheduled reporting.
+5. Improve administration and monitoring.
+6. Improve conversation management and AI Chat usability.
+7. Improve integration reliability.
+8. Introduce additional specialized agents where business value justifies them.
+9. Expand business intelligence capabilities.
 
 ---
 
@@ -355,12 +463,13 @@ For future enterprise versions:
 
 1. Implement scalable background processing.
 2. Introduce advanced AI evaluation.
-3. Add enterprise monitoring.
+3. Add enterprise monitoring and centralized observability.
 4. Improve personalization.
 5. Provide mobile/PWA support.
 6. Add additional specialized agents.
 7. Expand business intelligence.
-8. Support additional external services.
+8. Support additional external services where required.
+9. Introduce enterprise-scale infrastructure when justified by deployment requirements.
 
 ---
 
@@ -369,20 +478,25 @@ For future enterprise versions:
 Future development should follow these principles:
 
 * Complete foundational dependencies before dependent features.
+* Avoid rebuilding functionality that is already stable and implemented.
 * Avoid implementing advanced functionality on unstable components.
-* Keep external integrations isolated through tools.
-* Use permissions before executing sensitive actions.
+* Keep external integrations isolated through the Tool Registry.
+* Use permission checks before executing sensitive actions.
 * Use approval workflows for high-risk operations.
 * Maintain auditability for important business actions.
-* Test integrations independently before multi-agent integration.
+* Test integrations independently before combining them with multi-agent workflows.
 * Keep configuration and secrets outside source code.
 * Document new dependencies whenever a feature is introduced.
 * Maintain backward compatibility where practical.
+* Prefer incremental improvements over unnecessary architectural changes.
+* Introduce infrastructure complexity only when justified by actual requirements.
 
 ---
 
 ## 10. Conclusion
 
-The future development of Vetri AI Multi-Agent should prioritize **security, reliability, AI quality, and core integrations** before advanced user-facing features.
+Vetri AI Multi-Agent already provides a functional foundation for AI-assisted business operations through specialized agents, orchestration, permissions, tools, approvals, knowledge retrieval, automation, reporting, communication capabilities, and selected integrations.
 
-A dependency-aware implementation strategy will allow the platform to grow from the current MVP foundation into a more intelligent, secure, scalable, and enterprise-ready business assistant without introducing unnecessary technical risks.
+Future development should therefore focus on **security, reliability, AI quality, monitoring, analytics, usability, and scalability** rather than treating the existing core platform as unfinished.
+
+A dependency-aware and incremental development strategy will allow Vetri AI Multi-Agent to evolve from its current functional platform into a more reliable, intelligent, secure, and scalable business assistant while minimizing unnecessary technical risk.

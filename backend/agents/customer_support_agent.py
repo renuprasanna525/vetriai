@@ -81,7 +81,7 @@ class CustomerSupportAgent(BaseAgent):
         if not any(keyword in request_lower for keyword in support_keywords):
             return {
                 "agent": self.name,
-                "status": "error",
+                "status": "unsupported",
                 "data": {},
                 "message": (
                     "The requested customer support information "

@@ -33,9 +33,104 @@ class ProjectAgent(BaseAgent):
 
         return any(keyword in request_lower for keyword in project_keywords)
 
-    def get_required_permission(self, request):
+    def get_required_permission(self, request, user=None):
+        print("PROJECT AGENT PERMISSION REQUEST:", repr(request))
         request_lower = request.lower()
+        employee_role = False
 
+        if user is not None:
+            try:
+                employee_role = getattr(user.profile, "role", "").lower() == "employee"
+            except Exception:
+                employee_role = False
+        print(
+            "PROJECT AGENT EMPLOYEE ROLE CHECK:",
+            repr(getattr(user.profile, "role", None)),
+            employee_role,
+        )
+
+        own_data_phrases = [
+            "my",
+            "own",
+            "assigned to me",
+            "assigned for me",
+            "for me",
+            "to me",
+            "am i working on",
+            "i am working on",
+            "i'm working on",
+            "i work on",
+            "am i assigned",
+            "i am assigned",
+            "i'm assigned",
+        ]
+
+        is_own_request = any(phrase in request_lower for phrase in own_data_phrases)
+        project_names = [
+            "vetri e-commerce",
+            "ai dashboard",
+            "crm system",
+            "hr management system",
+        ]
+        is_project_entity_request = any(
+            project_name in request_lower for project_name in project_names
+        )
+        print(
+            "PROJECT PERMISSION STATE:",
+            repr(request_lower),
+            "contains_project=",
+            "project" in request_lower,
+            "is_own_request=",
+            is_own_request,
+            "employee_role=",
+            employee_role,
+        )
+        # -------------------------------------------------
+        # IMPORTANT:
+        # Check explicit project requests BEFORE task
+        # requests because project prompts may also contain
+        # the word "task".
+        # -------------------------------------------------
+        if "project" in request_lower or is_project_entity_request:
+            print(
+                "PROJECT PERMISSION BRANCH:",
+                repr(request_lower),
+                "employee_role=",
+                employee_role,
+            )
+
+            if is_own_request:
+                return "view_own_projects"
+            if any(
+                keyword in request_lower
+                for keyword in [
+                    "status",
+                    "delayed",
+                    "delay",
+                    "deadline",
+                    "milestone",
+                ]
+            ):
+                return "view_project_status"
+            if employee_role:
+                return "view_own_projects"
+
+            return "view_projects"
+
+        # -------------------------------------------------
+        # Task requests
+        # -------------------------------------------------
+
+        if "task" in request_lower:
+
+            if is_own_request:
+                return "view_own_tasks"
+
+            return "view_projects"
+
+        # -------------------------------------------------
+        # Project status requests without explicit project
+        # -------------------------------------------------
         if any(
             keyword in request_lower
             for keyword in [
@@ -47,18 +142,6 @@ class ProjectAgent(BaseAgent):
             ]
         ):
             return "view_project_status"
-
-        if "task" in request_lower:
-            if "my" in request_lower or "own" in request_lower:
-                return "view_own_tasks"
-
-            return "view_projects"
-
-        if "project" in request_lower:
-            if "my" in request_lower or "own" in request_lower:
-                return "view_own_projects"
-
-            return "view_projects"
 
         return "view_projects"
 
@@ -155,6 +238,60 @@ class ProjectAgent(BaseAgent):
                         "data": {"project": matching_project},
                         "message": message,
                     }
+        # =====================================================
+        # EMPLOYEE'S OWN PROJECTS
+        # =====================================================
+
+        own_project_phrases = [
+            "my projects",
+            "my project",
+            "projects assigned to me",
+            "projects assigned for me",
+            "projects for me",
+            "projects i'm working on",
+            "projects i am working on",
+            "projects i'm working on",
+            "which projects am i working on",
+            "what projects am i working on",
+            "currently working on",
+            "currently assigned",
+        ]
+
+        is_own_project_request = any(
+            phrase in request_lower for phrase in own_project_phrases
+        )
+
+        if is_own_project_request:
+            result = self.project_tool.execute("get_projects", user)
+
+            if result.get("status") == "success":
+                data = result.get("data", {})
+                projects = data.get("projects", [])
+
+            if projects:
+                details = []
+
+                for project in projects:
+                    name = project.get("name", "Unknown project")
+                    status = project.get("status", "Unknown")
+                    progress = project.get("progress", "Unknown")
+
+                    details.append(f"{name} ({status}, {progress}% progress)")
+
+                message = (
+                    "These are the projects currently assigned to you: "
+                    + "; ".join(details)
+                    + "."
+                )
+            else:
+                message = "You currently do not have any projects assigned to you."
+
+            return {
+                "agent": self.name,
+                "status": "success",
+                "data": data,
+                "message": message,
+            }
 
         # =====================================================
         # DELAYED PROJECTS
@@ -323,7 +460,7 @@ class ProjectAgent(BaseAgent):
 
         return {
             "agent": self.name,
-            "status": "error",
+            "status": "unsupported",
             "data": {},
             "message": (
                 "The requested project information " "is not currently supported."

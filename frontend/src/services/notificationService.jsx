@@ -1,12 +1,12 @@
+
 import { authFetch } from "./authFetch";
+import { API_BASE_URL } from "./apiConfig";
 
-const API_BASE_URL =
-    "https://vetri-ai-backend-i3pw.onrender.com/api/notifications";
-
+const NOTIFICATIONS_URL = `${API_BASE_URL}/notifications`;
 
 export async function getNotifications() {
     const response = await authFetch(
-        `${API_BASE_URL}/`,
+        `${NOTIFICATIONS_URL}/`,
         {
             method: "GET",
             headers: {
@@ -26,10 +26,9 @@ export async function getNotifications() {
     return data;
 }
 
-
 export async function getNotification(notificationId) {
     const response = await authFetch(
-        `${API_BASE_URL}/${notificationId}/`,
+        `${NOTIFICATIONS_URL}/${notificationId}/`,
         {
             method: "GET",
             headers: {
@@ -49,10 +48,9 @@ export async function getNotification(notificationId) {
     return data;
 }
 
-
 export async function markNotificationRead(notificationId) {
     const response = await authFetch(
-        `${API_BASE_URL}/${notificationId}/read/`,
+        `${NOTIFICATIONS_URL}/${notificationId}/read/`,
         {
             method: "PUT",
             headers: {
@@ -70,4 +68,32 @@ export async function markNotificationRead(notificationId) {
     }
 
     return data;
+}
+
+export async function deleteNotification(notificationId) {
+    const response = await authFetch(
+        `${NOTIFICATIONS_URL}/${notificationId}/`,
+        {
+            method: "DELETE",
+            headers: {
+                "Content-Type": "application/json",
+            },
+        }
+    );
+
+    if (!response.ok) {
+        let data = {};
+
+        try {
+            data = await response.json();
+        } catch {
+            // DELETE may return an empty response body.
+        }
+
+        throw new Error(
+            data.detail || "Failed to delete notification"
+        );
+    }
+
+    return true;
 }

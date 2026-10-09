@@ -370,7 +370,7 @@ class CRMAgent(BaseAgent):
 
         return {
             "agent": self.name,
-            "status": "error",
+            "status": "unsupported",
             "data": {},
             "message": ("The requested CRM information " "is not currently supported."),
         }

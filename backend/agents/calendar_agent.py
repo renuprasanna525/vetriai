@@ -74,11 +74,15 @@ class CalendarAgent(BaseAgent):
             action = "get_today_events"
             day_label = "today"
 
+        elif "upcoming" in request_lower:
+            action = "get_upcoming_events"
+            day_label = "the upcoming 7 days"
+
         else:
 
             return {
                 "agent": self.name,
-                "status": "error",
+                "status": "unsupported",
                 "data": {},
                 "message": (
                     "I can currently help you with today's, "

@@ -361,6 +361,26 @@ select {
   border: 2px solid #ffffff;
 }
 
+.notification-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.notification-delete-btn {
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.notification-delete-btn:hover {
+  transform: translateY(-1px);
+}
+
+.notification-delete-btn:active {
+  transform: translateY(0);
+}
+
 
 /* =========================================================
    HEADER USER
@@ -1121,4 +1141,548 @@ select {
     display: none;
   }
 
+}
+
+/* =========================================================
+   DASHBOARD ANIMATIONS
+========================================================= */
+
+/* Dashboard page entrance */
+@keyframes dashboardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+/* Dashboard content animation */
+.page-content {
+  animation: dashboardFadeIn 0.5s ease-out;
+}
+
+
+/* Stat card entrance */
+@keyframes statCardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dashboard-stat-card {
+  animation: statCardEnter 0.45s ease-out both;
+}
+
+
+/* Stagger stat cards */
+.dashboard-stat-card:nth-child(1) {
+  animation-delay: 0.05s;
+}
+
+.dashboard-stat-card:nth-child(2) {
+  animation-delay: 0.10s;
+}
+
+.dashboard-stat-card:nth-child(3) {
+  animation-delay: 0.15s;
+}
+
+.dashboard-stat-card:nth-child(4) {
+  animation-delay: 0.20s;
+}
+
+
+/* Section card entrance */
+@keyframes sectionCardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dashboard-section-card {
+  animation: sectionCardEnter 0.5s ease-out both;
+}
+
+
+/* Project status analytics */
+@keyframes projectStatusEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.dashboard-section-card .border.rounded {
+  animation: projectStatusEnter 0.45s ease-out both;
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+
+/* Project status hover */
+.dashboard-section-card .border.rounded:hover {
+  transform: translateY(-3px);
+
+  border-color: #dbeafe !important;
+
+  box-shadow:
+    0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+
+/* Activity items */
+.dashboard-activity-item {
+  animation: dashboardFadeIn 0.4s ease-out both;
+}
+
+
+/* List items */
+.dashboard-section-card .list-group-item {
+  animation: dashboardFadeIn 0.35s ease-out both;
+}
+
+
+/* Smooth icon animation */
+.dashboard-stat-icon {
+  transition:
+    transform 0.25s ease,
+    background-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.dashboard-stat-card:hover .dashboard-stat-icon {
+  transform: scale(1.08) rotate(2deg);
+
+  box-shadow:
+    0 5px 12px rgba(37, 99, 235, 0.12);
+}
+
+
+/* Notification pulse */
+@keyframes notificationPulse {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.08);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+.notification-badge {
+  animation: notificationPulse 2s ease-in-out infinite;
+}
+
+
+/* Loading spinner enhancement */
+.dashboard-loading .spinner-border {
+  animation-duration: 0.75s;
+}
+
+
+/* =========================================================
+   ACCESSIBILITY
+========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+}
+
+/* =========================================================
+   PROJECT STATUS ANALYTICS
+========================================================= */
+
+.project-status-card {
+  background-color: #ffffff;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.project-status-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  border-color: #dbeafe !important;
+}
+
+.project-status-card h3 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.dashboard-project-status-icon {
+  width: 42px;
+  height: 42px;
+
+  margin: 0 auto 10px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background-color: #eff6ff;
+  color: #2563eb;
+
+  font-size: 18px;
+
+  transition:
+    transform 0.25s ease,
+    background-color 0.25s ease;
+}
+
+.project-status-card:hover .dashboard-project-status-icon {
+  transform: scale(1.1);
+  background-color: #dbeafe;
+}
+
+/* =========================================================
+   FINANCIAL ANALYTICS
+========================================================= */
+
+.financial-card {
+  background-color: #ffffff;
+
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.financial-card:hover {
+  transform: translateY(-4px);
+
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.08);
+
+  border-color: #dbeafe !important;
+}
+
+.financial-card h3 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.financial-icon {
+  width: 42px;
+  height: 42px;
+
+  margin: 0 auto 10px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background-color: #eff6ff;
+  color: #2563eb;
+
+  font-size: 18px;
+
+  transition:
+    transform 0.25s ease,
+    background-color 0.25s ease;
+}
+
+.financial-card:hover .financial-icon {
+  transform: scale(1.1);
+  background-color: #dbeafe;
+}
+
+/* =========================================================
+   SALES ANALYTICS
+========================================================= */
+
+.sales-card {
+  background-color: #ffffff;
+
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.sales-card:hover {
+  transform: translateY(-4px);
+
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.08);
+
+  border-color: #dbeafe !important;
+}
+
+.sales-card h3 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.sales-icon {
+  width: 42px;
+  height: 42px;
+
+  margin: 0 auto 10px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background-color: #eff6ff;
+  color: #2563eb;
+
+  font-size: 18px;
+
+  transition:
+    transform 0.25s ease,
+    background-color 0.25s ease;
+}
+
+.sales-card:hover .sales-icon {
+  transform: scale(1.1);
+  background-color: #dbeafe;
+}
+
+/* =========================================================
+   EMPLOYEE & HR ANALYTICS
+========================================================= */
+
+.hr-card {
+  background-color: #ffffff;
+
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.hr-card:hover {
+  transform: translateY(-4px);
+
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.08);
+
+  border-color: #dbeafe !important;
+}
+
+.hr-card h3 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.hr-icon {
+  width: 42px;
+  height: 42px;
+
+  margin: 0 auto 10px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background-color: #eff6ff;
+  color: #2563eb;
+
+  font-size: 18px;
+
+  transition:
+    transform 0.25s ease,
+    background-color 0.25s ease;
+}
+
+.hr-card:hover .hr-icon {
+  transform: scale(1.1);
+  background-color: #dbeafe;
+}
+
+/* =========================================================
+   TASK & WORKLOAD ANALYTICS
+========================================================= */
+
+.workload-card {
+  background-color: #ffffff;
+
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.workload-card:hover {
+  transform: translateY(-4px);
+
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.08);
+
+  border-color: #dbeafe !important;
+}
+
+.workload-card h3 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.workload-icon {
+  width: 42px;
+  height: 42px;
+
+  margin: 0 auto 10px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background-color: #eff6ff;
+  color: #2563eb;
+
+  font-size: 18px;
+
+  transition:
+    transform 0.25s ease,
+    background-color 0.25s ease;
+}
+
+.workload-card:hover .workload-icon {
+  transform: scale(1.1);
+  background-color: #dbeafe;
+}
+
+/* =========================================================
+   CUSTOMER ANALYTICS
+========================================================= */
+
+.customer-card {
+  background-color: #ffffff;
+
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.customer-card:hover {
+  transform: translateY(-4px);
+
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.08);
+
+  border-color: #dbeafe !important;
+}
+
+.customer-card h3 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.customer-icon {
+  width: 42px;
+  height: 42px;
+
+  margin: 0 auto 10px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background-color: #eff6ff;
+  color: #2563eb;
+
+  font-size: 18px;
+
+  transition:
+    transform 0.25s ease,
+    background-color 0.25s ease;
+}
+
+.customer-card:hover .customer-icon {
+  transform: scale(1.1);
+  background-color: #dbeafe;
+}
+
+/* =========================================================
+   DASHBOARD LOADING ANIMATION
+========================================================= */
+
+.dashboard-loading-icon {
+  width: 56px;
+  height: 56px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 14px;
+
+  background-color: #eff6ff;
+  color: #2563eb;
+
+  font-size: 24px;
+
+  animation: dashboardLoadingPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes dashboardLoadingPulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
 }

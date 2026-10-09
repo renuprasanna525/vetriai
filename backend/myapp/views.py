@@ -269,11 +269,11 @@ def conversations_api(request):
     )
 
 
-@api_view(["GET"])
+@api_view(["GET", "DELETE", "PATCH"])
 @permission_classes([IsAuthenticated])
 def conversation_detail_api(request, conversation_id):
     """
-    Return one conversation belonging to the
+    Return or delete one conversation belonging to the
     currently authenticated user.
     """
 
@@ -296,14 +296,85 @@ def conversation_detail_api(request, conversation_id):
             status=404,
         )
 
-    serializer = ConversationSerializer(conversation)
+    # -------------------------------------------------
+    # GET - Return conversation details
+    # -------------------------------------------------
 
-    return Response(
-        {
-            "status": "success",
-            "conversation": serializer.data,
-        }
-    )
+    if request.method == "GET":
+
+        serializer = ConversationSerializer(conversation)
+
+        return Response(
+            {
+                "status": "success",
+                "conversation": serializer.data,
+            }
+        )
+
+    # -------------------------------------------------
+    # DELETE - Delete conversation
+    # -------------------------------------------------
+
+    if request.method == "DELETE":
+
+        conversation.delete()
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Conversation deleted successfully.",
+            }
+        )
+
+    # -------------------------------------------------
+    # PATCH - Rename conversation
+    # -------------------------------------------------
+
+    if request.method == "PATCH":
+
+        title = request.data.get("title")
+
+        if title is None:
+            return Response(
+                {
+                    "status": "error",
+                    "message": "Conversation title is required.",
+                },
+                status=400,
+            )
+
+        title = str(title).strip()
+
+        if not title:
+            return Response(
+                {
+                    "status": "error",
+                    "message": "Conversation title cannot be empty.",
+                },
+                status=400,
+            )
+
+        if len(title) > 255:
+            return Response(
+                {
+                    "status": "error",
+                    "message": "Conversation title cannot exceed 255 characters.",
+                },
+                status=400,
+            )
+
+        conversation.title = title
+        conversation.save(update_fields=["title", "updated_at"])
+
+        serializer = ConversationSerializer(conversation)
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Conversation renamed successfully.",
+                "conversation": serializer.data,
+            }
+        )
 
 
 @api_view(["GET"])
@@ -452,6 +523,21 @@ def dashboard_api(request):
         )
 
         # -----------------------------------------
+        # Workload
+        # -----------------------------------------
+        task_list = project_tasks.get("data", {}).get("tasks", [])
+        total_tasks = len(task_list)
+        completed_tasks = sum(
+            1 for task in task_list if task.get("status", "").lower() == "completed"
+        )
+        active_tasks = total_tasks - completed_tasks
+        workload = {
+            "total_tasks": total_tasks,
+            "completed_tasks": completed_tasks,
+            "active_tasks": active_tasks,
+        }
+
+        # -----------------------------------------
         # Return Dashboard
         # -----------------------------------------
 
@@ -519,6 +605,7 @@ def dashboard_api(request):
                         "data",
                         {},
                     ),
+                    "workload": workload,
                 },
             }
         )

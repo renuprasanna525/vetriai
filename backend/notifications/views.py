@@ -20,7 +20,7 @@ class NotificationListView(generics.ListAPIView):
         )
 
 
-class NotificationDetailView(generics.RetrieveAPIView):
+class NotificationDetailView(generics.RetrieveDestroyAPIView):
     """
     Returns a single notification belonging to the logged-in user.
     """

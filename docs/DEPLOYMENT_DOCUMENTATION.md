@@ -259,7 +259,7 @@ The deployed project should use the WSGI module belonging to the Django project.
 For example:
 
 ```text
-gunicorn imageproject.wsgi:application
+gunicorn backend.wsgi:application
 ```
 
 The actual WSGI module configured in the Render service must match the backend project structure.
@@ -277,7 +277,8 @@ SECRET_KEY
 DEBUG
 ALLOWED_HOSTS
 DATABASE_URL
-OPENAI_API_KEY
+GROQ_API_KEY
+GROQ_MODEL
 GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET
 EMAILJS configuration
@@ -313,11 +314,25 @@ A mismatch results in a Google OAuth `redirect_uri_mismatch` error.
 
 # 15. Google Calendar Credentials
 
-The Google Calendar client credentials file is used by the backend to initiate OAuth.
+The Google Calendar OAuth client credentials are configured through environment variables rather than a credentials file.
 
-Credential files and secret keys must not be committed to GitHub.
+The backend uses the following environment variables:
 
-For production deployment, credentials should be securely configured according to the deployment environment.
+* `GOOGLE_CLIENT_ID`
+* `GOOGLE_CLIENT_SECRET`
+* `GOOGLE_REDIRECT_URI`
+
+The backend dynamically creates the Google OAuth flow using these values. The Google Calendar integration requests read-only calendar access using the following scope:
+
+```text
+https://www.googleapis.com/auth/calendar.readonly
+```
+
+Credential values and secret keys must not be committed to GitHub.
+
+For production deployment, the Google Calendar OAuth credentials and redirect URI must be securely configured through the deployment environment.
+
+After successful Google authentication, the user's OAuth credentials are stored in the Django session and used by the backend to access the Google Calendar API.
 
 After deployment, the Calendar login flow should be tested by:
 

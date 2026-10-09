@@ -108,14 +108,17 @@ Registered agents include:
 * Calendar Agent
 * HR Agent
 * Sales Agent
+* CRM Agent
 * Project Agent
 * Finance Agent
 * Marketing Agent
 * Developer Agent
+* Customer Support Agent
 * QA Agent
 * Operations Agent
 * Reporting Agent
 * GitHub Agent
+* Cloud Storage Agent
 
 The Agent Registry API can be used to retrieve the available agents.
 
@@ -279,6 +282,8 @@ Notifications provide information about important application events.
 
 Notifications can include:
 
+Notifications may be delivered through supported notification channels, including in-app notifications, email, and WhatsApp when configured.
+
 * Approval requests
 * Approved actions
 * Executed actions
@@ -339,7 +344,7 @@ The audit log API is:
 GET /api/audit-logs/
 ```
 
-The current audit log view does not enforce authentication. This should be considered when hardening the production application.
+The audit log view requires authentication and checks the user's view_audit_logs permission through the Permission Engine. Users without this permission are denied access.
 
 Administrators should protect audit information because it may contain sensitive operational details.
 
@@ -516,8 +521,23 @@ Administrators should manage:
 * Database configuration
 * OAuth credentials
 * Email configuration
+* WhatsApp configuration
 * AI/LLM credentials
 * Other required environment variables
+
+### WhatsApp Configuration and Delivery Status
+
+The WhatsApp notification service is implemented using the Meta WhatsApp Cloud API.
+
+The following production environment variables are required for real WhatsApp delivery:
+
+* WHATSAPP_API_URL
+* WHATSAPP_ACCESS_TOKEN
+* WHATSAPP_PHONE_NUMBER_ID
+
+The WhatsApp service includes configuration validation and delivery error handling.
+
+Real Meta WhatsApp message delivery remains pending until valid Meta WhatsApp Cloud API credentials are configured.
 
 Sensitive credentials must never be committed to GitHub.
 
@@ -586,7 +606,7 @@ After a new deployment, verify:
 * React application loads.
 * Login works.
 * API requests reach the backend.
-* Dashboard loads.
+* Dashboard loads and retrieves data from the /api/dashboard/ endpoint.
 * AI Chat works.
 
 ### Integrations
@@ -807,7 +827,9 @@ Regular maintenance should include:
 
 * [ ] Google Calendar tested
 * [ ] Email integration tested
-* [ ] External services available
+* [ ] WhatsApp configuration verified
+* [ ] WhatsApp real Meta delivery tested when credentials are available
+* [ ] Internal business tools responding correctly
 
 ## Automation
 

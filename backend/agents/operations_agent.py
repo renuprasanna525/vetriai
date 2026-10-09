@@ -67,7 +67,7 @@ class OperationsAgent(BaseAgent):
         if not any(keyword in request_lower for keyword in operations_keywords):
             return {
                 "agent": self.name,
-                "status": "error",
+                "status": "unsupported",
                 "data": {},
                 "message": (
                     "The requested operations information "

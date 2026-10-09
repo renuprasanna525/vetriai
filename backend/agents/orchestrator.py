@@ -1,6 +1,7 @@
 from .registry import AgentRegistry
 from permissions.permission_engine import PermissionEngine
 from audit_logs.utils import create_audit_log
+from audit_logs.models import AuditLog
 from knowledge_base.llm_service import LLMService
 
 
@@ -83,6 +84,13 @@ class AIOrchestrator:
             "what is important",
             "what's important",
             "what needs attention",
+            # Management attention questions
+            "which areas need attention",
+            "which area needs attention",
+            "which areas need the most attention",
+            "which area needs the most attention",
+            "which areas need attention first",
+            "which area needs attention first",
             "what should i focus on",
             "what should we focus on",
             "priorities for tomorrow",
@@ -158,6 +166,78 @@ class AIOrchestrator:
 
         return normalized in rejections
 
+    def is_ambiguous_pending_reference(
+        self,
+        request,
+        conversation_history=None,
+    ):
+        """
+        Detect questions such as:
+
+            "How many of those are pending?"
+            "How many of these are pending?"
+
+        when the previous sales conversation contains more than
+        one possible pending category, such as pending follow-ups
+        and pending orders.
+
+        The system should ask the user to clarify instead of guessing.
+        """
+
+        conversation_history = conversation_history or []
+
+        request_lower = request.lower().strip()
+
+        ambiguous_phrases = [
+            "how many are pending",
+            "how many of those are pending",
+            "how many of these are pending",
+            "which of those are pending",
+            "which of these are pending",
+            "which are pending",
+        ]
+
+        if not any(phrase in request_lower for phrase in ambiguous_phrases):
+            return False
+
+        previous_user = self.get_previous_user_message(
+            conversation_history,
+            current_request=request,
+        )
+
+        previous_assistant = self.get_last_assistant_message(conversation_history)
+
+        combined_context = (f"{previous_user} {previous_assistant}").lower()
+
+        has_followups = any(
+            phrase in combined_context
+            for phrase in [
+                "follow-up",
+                "follow up",
+                "followups",
+                "pending follow",
+            ]
+        )
+
+        has_orders = any(
+            phrase in combined_context
+            for phrase in [
+                "order",
+                "orders",
+                "pending order",
+                "pending orders",
+            ]
+        )
+        print("AMBIGUOUS PENDING DEBUG:")
+        print("REQUEST:", request)
+        print("REQUEST LOWER:", request_lower)
+        print("PREVIOUS USER:", previous_user)
+        print("HAS FOLLOWUPS:", has_followups)
+        print("HAS ORDERS:", has_orders)
+        print("COMBINED CONTEXT:", combined_context)
+
+        return has_followups and has_orders
+
     def is_follow_up_question(
         self,
         request,
@@ -209,12 +289,54 @@ class AIOrchestrator:
             "the same",
             "same project",
             "same task",
+            "first one",
+            "second one",
+            "third one",
+            "first order",
+            "second order",
+            "third order",
+            "waiting the longest",
+            "waited the longest",
+            "longest waiting",
+            "longest-waiting",
+            "longest pending",
+            "most days pending",
+            "how many of those",
+            "how many of these",
+            "how many are pending",
+            "what needs my attention",
+            "what needs my attention first",
+            "what needs attention first",
+            "what needs attention most",
+            "what should i attend to first",
+            "what should i prioritize",
+            "what should i prioritize first",
+            "what is most urgent",
+            "what is urgent",
+            "which needs attention",
+            "which needs attention first",
+            "what needs to be handled first",
+            "what should be handled first",
         ]
 
         request_lower = request.lower().strip()
 
         if not conversation_history:
             return False
+
+        # -----------------------------------------------------
+        # Normalize punctuation for reference detection
+        # -----------------------------------------------------
+        normalized_request = (
+            request_lower.replace("?", " ")
+            .replace("!", " ")
+            .replace(",", " ")
+            .replace(".", " ")
+            .replace(":", " ")
+            .replace(";", " ")
+        )
+
+        normalized_request = " ".join(normalized_request.split())
 
         # Direct follow-up phrase detection.
         if any(keyword in request_lower for keyword in follow_up_keywords):
@@ -225,6 +347,11 @@ class AIOrchestrator:
             request=request,
             conversation_history=conversation_history,
         )
+        # TEMPORARY DEBUG
+        print("FOLLOW-UP DEBUG REQUEST:", repr(request))
+        print("FOLLOW-UP DEBUG NORMALIZED:", repr(normalized_request))
+        print("FOLLOW-UP DEBUG ENTITIES:", entity_context)
+        print("FOLLOW-UP DEBUG WORDS:", normalized_request.split())
 
         if not entity_context:
             return False
@@ -235,6 +362,9 @@ class AIOrchestrator:
             "their",
             "that",
             "this",
+            "those",
+            "these",
+            "them",
             "that one",
             "this one",
             "that project",
@@ -247,13 +377,22 @@ class AIOrchestrator:
             "this task",
         ]
 
-        if request_lower in reference_phrases:
+        # Exact reference question
+        if normalized_request in reference_phrases:
+            return True
+        # -----------------------------------------------------
+        # Reference words
+        # -----------------------------------------------------
+        words = normalized_request.split()
+
+        if any(
+            word in words for word in ["it", "its", "their", "those", "these", "them"]
+        ):
             return True
 
-        words = request_lower.split()
-
-        if any(word in words for word in ["it", "its", "their"]):
-            return True
+        # -----------------------------------------------------
+        # Explicit reference patterns
+        # -----------------------------------------------------
 
         reference_patterns = [
             "that project",
@@ -272,8 +411,57 @@ class AIOrchestrator:
             phrase in request_lower for phrase in reference_patterns
         ):
             return True
-
+        print("FOLLOW-UP DEBUG RESULT: No follow-up condition matched")
         return False
+
+    # ADD THE NEW HELPER HERE
+    def is_clarification_reply(self, request, conversation_history):
+        """
+        Detect short replies that answer the assistant's
+        previous clarification question.
+        """
+        if not conversation_history:
+            return False
+
+        previous_assistant = self.get_last_assistant_message(conversation_history)
+
+        if not previous_assistant:
+            return False
+
+        assistant_text = previous_assistant.lower()
+        request_text = request.lower().strip().rstrip(".!?")
+        # The previous assistant must have asked for clarification.
+        clarification_phrases = [
+            "do you mean",
+            "which one do you mean",
+            "which do you mean",
+            "are you referring to",
+        ]
+
+        if not any(phrase in assistant_text for phrase in clarification_phrases):
+            return False
+
+        # Recognize the options in the pending sales clarification.
+        clarification_options = {
+            "orders": [
+                "orders",
+                "order",
+            ],
+            "follow_ups": [
+                "follow-ups",
+                "follow ups",
+                "followup",
+                "followups",
+            ],
+        }
+
+        return any(
+            request_text == option
+            or request_text == f"the {option}"
+            or request_text == f"those {option}"
+            for options in clarification_options.values()
+            for option in options
+        )
 
     # =========================================================
     # CONVERSATION CONTEXT
@@ -356,23 +544,52 @@ class AIOrchestrator:
     def get_previous_user_message(
         self,
         conversation_history,
+        current_request=None,
     ):
+        """
+        Get the previous user message from conversation history.
+
+        Supports both history formats:
+
+        1. History includes the current user message.
+        2. History contains only messages from before the current request.
+
+        If current_request is supplied and the latest user message
+        matches it, that message is skipped.
+        """
+
         if not conversation_history:
             return ""
 
-        found_current_user = False
+        current_request_normalized = ""
+
+        if current_request:
+            current_request_normalized = str(current_request).strip().lower()
 
         for message in reversed(conversation_history):
-            if message.get("sender") == "user":
 
-                if not found_current_user:
-                    found_current_user = True
-                    continue
+            if message.get("sender") != "user":
+                continue
 
-                return message.get(
-                    "content",
-                    "",
-                )
+            content = message.get(
+                "content",
+                "",
+            )
+
+            if not content:
+                continue
+
+            content_normalized = str(content).strip().lower()
+
+            # If the current request is already inside history,
+            # skip it and continue looking for the previous user message.
+            if (
+                current_request_normalized
+                and content_normalized == current_request_normalized
+            ):
+                continue
+
+            return content
 
         return ""
 
@@ -417,13 +634,68 @@ class AIOrchestrator:
         error_results = [
             result for result in results if result.get("status") == "error"
         ]
+        unsupported_results = [
+            result for result in results if result.get("status") == "unsupported"
+        ]
 
         # =====================================================
         # NO SUCCESSFUL RESULTS
         # =====================================================
 
         if not successful_results:
+            if unsupported_results:
+                unsupported_context = []
 
+                for result in unsupported_results:
+                    message = result.get("message", "").strip()
+
+                    if message:
+                        unsupported_context.append(message)
+                if unsupported_context:
+                    fallback_response = " ".join(unsupported_context)
+
+                else:
+                    fallback_response = (
+                        "The requested information or action "
+                        "is not currently supported."
+                    )
+                try:
+                    response = self.llm_service.generate_chat_response(
+                        question=request,
+                        agent_results=[
+                            {
+                                "agent": result.get(
+                                    "agent",
+                                    "Business Agent",
+                                ),
+                                "status": "unsupported",
+                                "message": result.get(
+                                    "message",
+                                    "",
+                                ),
+                                "data": {},
+                            }
+                            for result in unsupported_results
+                        ],
+                        conversation_context=self.format_conversation_context(
+                            conversation_history
+                        ),
+                    )
+                    if response and response.strip():
+                        return response.strip()
+                except Exception as error:
+                    print(
+                        "UNSUPPORTED RESPONSE LLM ERROR:",
+                        str(error),
+                    )
+
+                return (
+                    f"{fallback_response} "
+                    "I can still help you with the business "
+                    "areas and information currently available "
+                    "in Vetri AI. Please feel free to ask me "
+                    "another question."
+                )
             if fallback_response:
                 return fallback_response
 
@@ -481,6 +753,7 @@ class AIOrchestrator:
                     ),
                 }
             )
+        print("NATURAL RESULTS SENT TO GROQ:", natural_results)
 
         # =====================================================
         # CALL LLM FOR ALL SUCCESSFUL RESPONSES
@@ -569,19 +842,15 @@ class AIOrchestrator:
     def get_agents_from_conversation(
         self,
         conversation_history,
+        current_request=None,
     ):
         """
-        Detect the business agents involved in the previous
-        conversation.
+        Identify the most recent explicit business topic
+        from earlier user messages.
 
         Priority:
-
-        1. Previous USER message
-        2. No previous assistant fallback for explicit entity
-        3. Previous assistant only when necessary
-
-        This prevents generic assistant responses from
-        contaminating the next request with unrelated agents.
+        1. Most recent earlier user message with an agent topic
+        2. Previous assistant message as a limited fallback
         """
 
         if not conversation_history:
@@ -589,18 +858,8 @@ class AIOrchestrator:
 
         available_agents = self.registry.get_agents()
 
-        previous_user = self.get_previous_user_message(conversation_history)
-
-        previous_assistant = self.get_last_assistant_message(conversation_history)
-
-        print(
-            "CONTEXT PREVIOUS USER:",
-            previous_user,
-        )
-
-        print(
-            "CONTEXT PREVIOUS ASSISTANT:",
-            previous_assistant,
+        current_request_normalized = (
+            str(current_request).strip().lower() if current_request else ""
         )
 
         agent_keywords = {
@@ -615,7 +874,6 @@ class AIOrchestrator:
                 "payment",
                 "payments",
                 "budget",
-                "financial status",
             ],
             "Sales Agent": [
                 "sales",
@@ -629,6 +887,10 @@ class AIOrchestrator:
                 "customers",
                 "order",
                 "orders",
+                "opportunity",
+                "opportunities",
+                "conversion",
+                "conversions",
             ],
             "Project Agent": [
                 "project",
@@ -667,7 +929,6 @@ class AIOrchestrator:
                 "marketing",
                 "campaign",
                 "campaigns",
-                "marketing leads",
             ],
             "Developer Agent": [
                 "developer",
@@ -721,8 +982,6 @@ class AIOrchestrator:
                 "tasks",
                 "milestone",
                 "milestones",
-                "schedule",
-                "schedules",
             ],
             "Cloud Storage Agent": [
                 "cloud storage",
@@ -746,26 +1005,22 @@ class AIOrchestrator:
             if not text:
                 return []
 
-            text_lower = text.lower()
-
+            text_lower = str(text).lower()
             detected_agents = []
 
             for agent in available_agents:
-
                 agent_name = agent.name
 
                 if agent_name.lower() in text_lower:
                     detected_agents.append(agent)
                     continue
 
-                keywords = agent_keywords.get(
-                    agent_name,
-                    [],
-                )
+                keywords = agent_keywords.get(agent_name, [])
 
-                if any(keyword.lower() in text_lower for keyword in keywords):
+                if any(keyword in text_lower for keyword in keywords):
                     detected_agents.append(agent)
 
+            # Remove duplicates while preserving order.
             unique_agents = []
             seen_names = set()
 
@@ -777,42 +1032,67 @@ class AIOrchestrator:
             return unique_agents
 
         # -----------------------------------------------------
-        # Previous USER is authoritative
+        # 1. Search earlier USER messages, newest first.
+        # Skip the current request if it is already in history.
+        # Continue past generic follow-ups such as:
+        # "Tell me more about them."
         # -----------------------------------------------------
 
-        user_agents = detect_agents_from_text(previous_user)
+        for message in reversed(conversation_history):
 
-        if user_agents:
-            print("CONTEXT SOURCE: PREVIOUS USER MESSAGE")
+            if message.get("sender") != "user":
+                continue
 
-            print(
-                "PREVIOUS USER CONTEXT AGENTS:",
-                [agent.name for agent in user_agents],
-            )
+            content = message.get("content", "")
 
-            return user_agents
+            if not content:
+                continue
+
+            content_normalized = str(content).strip().lower()
+
+            if (
+                current_request_normalized
+                and content_normalized == current_request_normalized
+            ):
+                continue
+
+            user_agents = detect_agents_from_text(content)
+
+            if user_agents:
+                print("CONTEXT SOURCE: EARLIER EXPLICIT USER TOPIC")
+                print(
+                    "TOPIC USER MESSAGE:",
+                    content,
+                )
+                print(
+                    "CONTEXT AGENTS:",
+                    [agent.name for agent in user_agents],
+                )
+
+                return user_agents
 
         # -----------------------------------------------------
-        # Previous assistant is only a limited fallback.
-        #
-        # IMPORTANT:
-        # We do NOT use assistant context when the previous
-        # user message is simply an entity-reference question.
-        # Entity routing is handled separately.
+        # 2. Limited fallback to the previous assistant message
+        # only if no earlier user message identified a topic.
         # -----------------------------------------------------
+
+        previous_assistant = self.get_last_assistant_message(conversation_history)
 
         if previous_assistant:
             assistant_agents = detect_agents_from_text(previous_assistant)
 
             if assistant_agents:
                 print("CONTEXT SOURCE: PREVIOUS ASSISTANT MESSAGE")
-
                 print(
                     "PREVIOUS ASSISTANT CONTEXT AGENTS:",
                     [agent.name for agent in assistant_agents],
                 )
 
                 return assistant_agents
+
+        # -----------------------------------------------------
+        # 3. No matching context
+        # -----------------------------------------------------
 
         print("CONTEXT SOURCE: NONE")
         print("CONTEXT AGENTS DETECTED: []")
@@ -836,21 +1116,13 @@ class AIOrchestrator:
         1. Current user request
         2. Previous user message
         3. Previous assistant response
-
-        Examples:
-
-        Tell me more about Vetri E-Commerce
-            -> Vetri E-Commerce
-
-        Why is that project delayed?
-            -> Vetri E-Commerce
-
-        What tasks are pending for it?
-            -> Vetri E-Commerce
-
-        What about AI Dashboard?
-            -> AI Dashboard
         """
+        # TEMPORARY DEBUG PRINTS — ADD HERE
+        print("========== ENTITY CONTEXT INPUT DEBUG ==========")
+        print("CURRENT REQUEST:", repr(request))
+        print("HISTORY COUNT:", len(conversation_history or []))
+        print("HISTORY:", repr(conversation_history))
+        print("================================================")
 
         known_entities = [
             "Vetri E-Commerce",
@@ -871,12 +1143,18 @@ class AIOrchestrator:
             if not text:
                 return []
 
-            text_lower = text.lower()
+            # Normalize regular spaces, non-breaking spaces,
+            # narrow non-breaking spaces, and repeated whitespace.
+            text_lower = str(text).replace("\u00a0", " ").replace("\u202f", " ")
+            text_lower = " ".join(text_lower.casefold().split())
 
             detected_entities = []
 
             for entity in known_entities:
-                if entity.lower() in text_lower:
+                normalized_entity = entity.replace("\u00a0", " ").replace("\u202f", " ")
+                normalized_entity = " ".join(normalized_entity.casefold().split())
+
+                if normalized_entity in text_lower:
                     detected_entities.append(entity)
 
             return detected_entities
@@ -901,7 +1179,10 @@ class AIOrchestrator:
         # 2. Previous user message
         # -----------------------------------------------------
 
-        previous_user = self.get_previous_user_message(conversation_history)
+        previous_user = self.get_previous_user_message(
+            conversation_history,
+            current_request=request,
+        )
 
         previous_user_entities = detect_entities_from_text(previous_user)
 
@@ -922,8 +1203,16 @@ class AIOrchestrator:
         # -----------------------------------------------------
 
         previous_assistant = self.get_last_assistant_message(conversation_history)
+        print(
+            "DEBUG PREVIOUS ASSISTANT TEXT:",
+            repr(previous_assistant),
+        )
 
         previous_assistant_entities = detect_entities_from_text(previous_assistant)
+        print(
+            "DEBUG PREVIOUS ASSISTANT ENTITIES:",
+            previous_assistant_entities,
+        )
 
         if previous_assistant_entities:
             print("ENTITY CONTEXT SOURCE: PREVIOUS ASSISTANT MESSAGE")
@@ -1012,8 +1301,29 @@ class AIOrchestrator:
     ):
         """
         Detect agents directly mentioned in the current question.
+        Route order-ID queries directly to the Sales Agent.
         """
 
+        request_lower = str(request).lower()
+
+        # Direct order-ID detection
+        if "ord-" in request_lower:
+
+            sales_agent = next(
+                (
+                    agent
+                    for agent in self.registry.get_agents()
+                    if agent.name.lower() == "sales agent"
+                ),
+                None,
+            )
+
+            if sales_agent:
+                print("DIRECT ORDER ID DETECTED: Sales Agent")
+
+                return [sales_agent]
+
+        # Existing registry-based detection
         return self.registry.find_relevant_agents(request)
 
     # =========================================================
@@ -1023,10 +1333,12 @@ class AIOrchestrator:
         self,
         user,
         agent_name,
+        agent=None,
+        agent_request=None,
     ):
         """
-        Check whether the current user's role is allowed
-        to access the requested agent.
+        Check whether the user's role is allowed to access
+        the permission required for this specific request.
         """
 
         # Get the user's role from UserProfile
@@ -1045,7 +1357,9 @@ class AIOrchestrator:
         if not role:
             return False
 
-        # Agent -> Permission mapping
+        # Default agent -> permission mapping.
+        # Used when an agent does not provide request-specific
+        # permission logic.
         agent_permissions = {
             "Finance Agent": "view_finance",
             "Sales Agent": "view_sales",
@@ -1063,17 +1377,43 @@ class AIOrchestrator:
             "Calendar Agent": "view_calendar",
         }
 
-        permission = agent_permissions.get(agent_name)
-
         # Unknown agents are denied instead of being allowed
         # accidentally.
+        permission = agent_permissions.get(agent_name)
+
         if not permission:
             return False
+
+        # Use request-specific permission logic when available.
+        if (
+            agent is not None
+            and agent_request
+            and callable(getattr(agent, "get_required_permission", None))
+        ):
+            try:
+                required_permission = agent.get_required_permission(
+                    agent_request, user=user
+                )
+                print("AGENT REQUIRED PERMISSION:", required_permission)
+
+                if required_permission:
+                    permission = required_permission
+
+            except Exception:
+                pass
+        print("\n========== PERMISSION DEBUG ==========")
+        print("AGENT:", agent_name)
+        print("ROLE:", role)
+        print("REQUEST:", repr(agent_request))
+        print("FINAL PERMISSION:", permission)
 
         result = self.permission_engine.check_permission(
             role,
             permission,
         )
+
+        print("PERMISSION RESULT:", result)
+        print("======================================\n")
 
         return result.get("allowed", False)
 
@@ -1093,6 +1433,8 @@ class AIOrchestrator:
         allowed = self.check_agent_permission(
             user=user,
             agent_name=agent_name,
+            agent=agent,
+            agent_request=agent_request,
         )
 
         if not allowed:
@@ -1150,6 +1492,113 @@ class AIOrchestrator:
             }
 
     # =========================================================
+    # STRUCTURED AGENT-TO-AGENT COLLABORATION
+    # =========================================================
+
+    def request_agent_collaboration(
+        self,
+        requesting_agent,
+        target_agent_name,
+        collaboration_request,
+        user,
+        credentials=None,
+    ):
+        """
+        Allow one agent to request structured information
+        from another agent through the existing orchestrator.
+
+        The target agent is executed through execute_agent()
+        so the normal permission checks remain active.
+        """
+
+        requesting_agent_name = (
+            requesting_agent.name
+            if hasattr(requesting_agent, "name")
+            else str(requesting_agent)
+        )
+
+        print("=" * 60)
+        print("AGENT COLLABORATION REQUEST")
+        print("REQUESTING AGENT:", requesting_agent_name)
+        print("TARGET AGENT:", target_agent_name)
+        print("COLLABORATION REQUEST:", collaboration_request)
+        print("=" * 60)
+
+        target_agent = None
+
+        for agent in self.registry.get_agents():
+
+            if agent.name == target_agent_name:
+                target_agent = agent
+                break
+
+        if target_agent is None:
+
+            print(
+                "COLLABORATION TARGET NOT FOUND:",
+                target_agent_name,
+            )
+
+            return {
+                "type": "agent_collaboration",
+                "requesting_agent": requesting_agent_name,
+                "target_agent": target_agent_name,
+                "status": "error",
+                "message": (
+                    f"{target_agent_name} is not available " "for collaboration."
+                ),
+                "data": {},
+            }
+
+        result = self.execute_agent(
+            agent=target_agent,
+            agent_request=collaboration_request,
+            user=user,
+            credentials=credentials,
+        )
+
+        collaboration_result = {
+            "type": "agent_collaboration",
+            "requesting_agent": requesting_agent_name,
+            "target_agent": target_agent_name,
+            "status": result.get(
+                "status",
+                "success",
+            ),
+            "data": result.get(
+                "data",
+                {},
+            ),
+            "message": result.get(
+                "message",
+                "",
+            ),
+        }
+
+        print(
+            "AGENT COLLABORATION RESULT:",
+            collaboration_result,
+        )
+
+        try:
+
+            create_audit_log(
+                user=user,
+                action="agent_collaboration",
+                details={
+                    "requesting_agent": requesting_agent_name,
+                    "target_agent": target_agent_name,
+                    "request": collaboration_request,
+                    "status": collaboration_result["status"],
+                },
+            )
+
+        except Exception:
+            pass
+
+        return collaboration_result
+
+    # =========================================================
     # CONTEXTUAL AGENT REQUEST
     # =========================================================
 
@@ -1189,9 +1638,19 @@ class AIOrchestrator:
                     "and project risks that may need attention."
                 ),
                 "Sales Agent": (
-                    "Give current sales status and identify "
-                    "pending follow-ups, important leads, "
-                    "and sales items requiring attention."
+                    "Give current sales information and identify "
+                    "the specific sales item that may need attention "
+                    "based on the previous conversation. Focus on "
+                    "the same sales topic discussed previously. "
+                    "If the previous conversation was specifically "
+                    "about new leads, focus only on those new leads. "
+                    "Use only information returned by the CRM. "
+                    "If individual lead details are unavailable, "
+                    "clearly state that a specific lead cannot be "
+                    "identified. Do not switch to orders, follow-ups, "
+                    "customers, or a general sales summary unless "
+                    "the user explicitly asks for them. "
+                    "Do not invent information."
                 ),
                 "Finance Agent": (
                     "Give current finance status and identify "
@@ -1212,11 +1671,17 @@ class AIOrchestrator:
 
             detail_requests = {
                 "HR Agent": (
-                    "Give more detailed information about the "
-                    "current HR and employee status discussed "
-                    "in the previous conversation. Include "
-                    "important leave information and relevant "
-                    "employee items."
+                    "Continue the same HR topic from the previous conversation. "
+                    "If the previous conversation was about an employee's salary, "
+                    "retrieve the salary for the employee identified in the current "
+                    "request. If the previous conversation was about attendance, "
+                    "retrieve attendance information for the employee identified "
+                    "in the current request. If it was about leave, retrieve the "
+                    "relevant leave information. If it was about employee details, "
+                    "retrieve the relevant employee information. Preserve the "
+                    "previous HR topic when the current request only changes the "
+                    "employee or refers to another employee. Use only available "
+                    "HR data and do not invent information."
                 ),
                 "Project Agent": (
                     "Give more detailed information about the "
@@ -1325,6 +1790,60 @@ class AIOrchestrator:
 
             current_question_lower = current_question.lower()
             previous_user_lower = previous_user.lower()
+            # Preserve the previous explicit sales topic for
+            # contextual attention questions.
+            if attention_question:
+                if any(
+                    keyword in previous_user_lower
+                    for keyword in ["new lead", "new leads"]
+                ):
+                    base_request = (
+                        "The previous conversation was specifically about "
+                        "new sales leads. Retrieve current new-lead information "
+                        "from the CRM and focus only on those new leads. "
+                        "Identify a specific lead needing attention only if "
+                        "individual records and relevant priority details are "
+                        "available. If they are unavailable, state that clearly. "
+                        "Do not switch to follow-ups, orders, customers, or a "
+                        "general sales summary. Do not invent information."
+                    )
+                elif any(
+                    keyword in previous_user_lower
+                    for keyword in ["follow-up", "follow up", "followups"]
+                ):
+                    base_request = (
+                        "The previous conversation was specifically about "
+                        "pending sales follow-ups. Retrieve current pending "
+                        "follow-up information from the CRM. Include available "
+                        "customer names and pending durations, and identify "
+                        "the longest-pending follow-up when the data supports "
+                        "that comparison. Do not switch to leads, orders, "
+                        "customers, or a general sales summary. Do not invent "
+                        "information."
+                    )
+                elif any(
+                    keyword in previous_user_lower for keyword in ["order", "orders"]
+                ):
+                    base_request = (
+                        "The previous conversation was specifically about "
+                        "sales orders. Retrieve current order information from "
+                        "the CRM and identify any order requiring attention "
+                        "only when the available order details support it. "
+                        "Do not switch to leads, follow-ups, customers, or a "
+                        "general sales summary. Do not invent information."
+                    )
+                elif any(
+                    keyword in previous_user_lower
+                    for keyword in ["customer", "customers"]
+                ):
+                    base_request = (
+                        "The previous conversation was specifically about "
+                        "sales customers. Retrieve current customer information "
+                        "from the CRM and identify any customer requiring "
+                        "attention only when the available data supports it. "
+                        "Do not switch to leads, follow-ups, orders, or a "
+                        "general sales summary. Do not invent information."
+                    )
 
             # Detect vague follow-ups from the current question only.
             is_vague_detail_followup = any(
@@ -1341,9 +1860,27 @@ class AIOrchestrator:
             )
 
             if is_vague_detail_followup:
+                # An explicit topic in the current question takes priority
+                # over the previous conversation topic.
+                if any(
+                    keyword in current_question_lower
+                    for keyword in [
+                        "follow-up",
+                        "follow up",
+                        "followups",
+                    ]
+                ):
+                    base_request = (
+                        "Retrieve more information specifically about "
+                        "the pending sales follow-ups requested by the user. "
+                        "Include the customers requiring follow-up and "
+                        "how long each has been pending, when available. "
+                        "Do not switch to leads, orders, customers, or a "
+                        "general sales summary. Do not invent information."
+                    )
 
                 # Preserve the specific topic from the previous question.
-                if any(
+                elif any(
                     keyword in previous_user_lower
                     for keyword in ["new lead", "new leads"]
                 ):
@@ -1408,7 +1945,62 @@ class AIOrchestrator:
 
             else:
                 # An explicit topic in the current question takes priority.
+
+                # Comparative questions about pending follow-ups
                 if any(
+                    phrase in current_question_lower
+                    for phrase in [
+                        "waiting the longest",
+                        "waited the longest",
+                        "longest waiting",
+                        "longest-waiting",
+                        "longest pending",
+                        "most days pending",
+                    ]
+                ):
+                    base_request = (
+                        "Retrieve the current pending sales follow-up records "
+                        "needed to answer the user's comparative question. "
+                        "Include each available customer name and the exact "
+                        "number of days their follow-up has been pending. "
+                        "Compare the waiting durations and identify the "
+                        "customer with the greatest number of pending days. "
+                        "Use only durations present in the retrieved data. "
+                        "If the durations are unavailable or cannot be "
+                        "compared, clearly state that. Do not invent "
+                        "customer names or waiting durations."
+                    )
+
+                # Ordinal order references such as "first one", "second one"
+                elif any(
+                    phrase in current_question_lower
+                    for phrase in [
+                        "first one",
+                        "second one",
+                        "third one",
+                        "first order",
+                        "second order",
+                        "third order",
+                    ]
+                ):
+                    base_request = (
+                        "Resolve the user's ordinal reference using the order list "
+                        "from the previous conversation. The user is referring to "
+                        "an order by its position in the previously discussed order "
+                        "list.\n\n"
+                        "Use the same order ordering that was previously shown to "
+                        "the user. For example, 'first one' means the first order "
+                        "in that previous list and 'second one' means the second "
+                        "order in that previous list.\n\n"
+                        "Return the actual matching order record and use its available "
+                        "order ID, customer, amount, and status to answer the current "
+                        "question. If the requested position cannot be resolved, "
+                        "clearly state that the order could not be identified. "
+                        "Do not invent information."
+                    )
+
+                # Existing order condition
+                elif any(
                     keyword in current_question_lower
                     for keyword in [
                         "pending order",
@@ -1425,26 +2017,6 @@ class AIOrchestrator:
                         "order details and statuses. Focus specifically "
                         "on orders rather than returning the complete "
                         "sales summary. Do not invent information."
-                    )
-
-                elif any(
-                    keyword in current_question_lower
-                    for keyword in [
-                        "follow-up",
-                        "follow up",
-                        "followups",
-                        "pending follow-up",
-                        "pending follow-ups",
-                    ]
-                ):
-                    base_request = (
-                        "Retrieve the current pending sales follow-up "
-                        "information needed to answer the user's question. "
-                        "Include the customers requiring follow-up and "
-                        "how long each follow-up has been pending. "
-                        "Focus specifically on pending follow-ups rather "
-                        "than returning the complete sales summary. "
-                        "Do not invent information."
                     )
 
                 elif any(
@@ -1495,38 +2067,184 @@ class AIOrchestrator:
                         "leads, pending follow-ups, customers, orders, "
                         "and other available sales details."
                     )
-        # -----------------------------------------------------
-        # Project task / item-specific requests
-        # -----------------------------------------------------
 
-        request_lower = request.lower()
+        # -----------------------------------------------------
+        # HR-specific contextual follow-up requests
+        # -----------------------------------------------------
+        if agent_name == "HR Agent":
 
-        if agent_name == "Project Agent":
+            current_question_lower = request.lower()
+            previous_user_lower = previous_user.lower()
+            # -------------------------------------------------
+            # Pending leave requests
+            # -------------------------------------------------
             if any(
-                keyword in request_lower
-                for keyword in [
-                    "pending task",
-                    "pending tasks",
-                    "what tasks",
-                    "which tasks",
-                    "task status",
-                    "status of",
-                    "payment integration",
-                    "dashboard ui",
-                    "customer module",
+                phrase in previous_user_lower
+                for phrase in [
+                    "pending leave",
+                    "pending leave request",
+                    "pending leave requests",
+                    "leave request",
+                    "leave requests",
                 ]
             ):
                 base_request = (
-                    "Retrieve the project-level and task-level information "
-                    "needed to answer the current question. Include the "
-                    "specific project or task requested, its current status, "
-                    "progress, pending/in-progress/completed state, delay "
-                    "information, and related project details when available. "
-                    "For task questions, return the actual task names and "
-                    "their statuses from the available project records. "
-                    "Do not replace task-level information with only a "
-                    "high-level project summary. Do not invent information."
+                    "Retrieve information specifically about the leave requests "
+                    "discussed in the previous conversation.\n\n"
+                    "The previous topic was leave requests. Preserve that topic "
+                    "for this follow-up and do not replace it with a general "
+                    "employee-on-leave summary.\n\n"
+                    "If pending leave-request records are available, return "
+                    "their current status and relevant employee information. "
+                    "If pending leave-request data is unavailable, clearly "
+                    "state that the pending leave-request information is not "
+                    "available.\n\n"
+                    "Do not switch to attendance, employee salary, general "
+                    "employee information, or current employees on leave "
+                    "unless the user explicitly asks for them.\n"
+                    "Do not invent information."
                 )
+            # -------------------------------------------------
+            # Employee-specific leave/status
+            # -------------------------------------------------
+            elif entity_context and any(
+                phrase in previous_user_lower
+                for phrase in [
+                    "leave",
+                    "on leave",
+                ]
+            ):
+                entity_name = entity_context[0]
+                base_request = (
+                    f"Retrieve the leave information specifically for "
+                    f"the employee '{entity_name}'.\n\n"
+                    f"The previous conversation was about '{entity_name}' "
+                    "and their leave.\n\n"
+                    "For the current follow-up, preserve this employee and "
+                    "leave context. If the user asks for the status, provide "
+                    "the available leave status for this employee.\n\n"
+                    "Do not switch to the general employee list or unrelated "
+                    "HR information.\n"
+                    "Use only information available from the HR data.\n"
+                    "Do not invent information."
+                )
+            # -------------------------------------------------
+            # Attendance follow-up
+            # -------------------------------------------------
+
+            elif any(
+                phrase in previous_user_lower
+                for phrase in [
+                    "attendance",
+                    "absent",
+                    "present",
+                ]
+            ):
+                base_request = (
+                    "Retrieve more detailed information about the attendance "
+                    "topic discussed in the previous conversation.\n\n"
+                    "Preserve the attendance context and provide the available "
+                    "attendance information.\n"
+                    "Do not switch to leave information or general employee "
+                    "information unless explicitly requested.\n"
+                    "Do not invent information."
+                )
+            # -------------------------------------------------
+            # General employee information
+            # -------------------------------------------------
+            elif any(
+                phrase in previous_user_lower
+                for phrase in [
+                    "employee",
+                    "employees",
+                    "staff",
+                    "team member",
+                    "team members",
+                ]
+            ):
+                base_request = (
+                    "Retrieve more detailed information about the employee "
+                    "information discussed in the previous conversation.\n\n"
+                    "Preserve the employee-information context and provide "
+                    "available employee details.\n"
+                    "Do not switch to unrelated HR topics.\n"
+                    "Do not invent information."
+                )
+
+        # -----------------------------------------------------
+        # Project task / item-specific requests
+        # -----------------------------------------------------
+        request_lower = request.lower()
+
+        # -------------------------------------------------
+        # Explicit employee-owned project request
+        # -------------------------------------------------
+
+        is_own_project_request = False
+
+        if agent_name == "Project Agent":
+            is_own_project_request = any(
+                phrase in request_lower
+                for phrase in [
+                    "my projects",
+                    "my project",
+                    "projects assigned to me",
+                    "projects assigned for me",
+                    "projects assigned to",
+                    "projects for me",
+                    "projects i'm working on",
+                    "projects i am working on",
+                    "which projects am i working on",
+                    "what projects am i working on",
+                    "currently working on",
+                    "currently assigned",
+                ]
+            )
+        if is_own_project_request:
+            # The current question explicitly asks for the
+            # employee's own projects. Do not let an entity
+            # from the previous task conversation override it.
+            entity_context = []
+
+            base_request = (
+                "Retrieve only the projects currently assigned to "
+                "the authenticated employee.\n\n"
+                "The user is asking which projects they are currently "
+                "working on. Return the employee's own assigned projects "
+                "from the available project records.\n\n"
+                "Include project names and their current status when "
+                "available. If related tasks are available, include them "
+                "only when they belong to the employee's assigned projects.\n\n"
+                "Do not return general company-wide project information. "
+                "Do not return unrelated delayed projects. "
+                "Do not use projects from other employees. "
+                "Do not invent project assignments."
+            )
+        elif any(
+            keyword in request_lower
+            for keyword in [
+                "pending task",
+                "pending tasks",
+                "what tasks",
+                "which tasks",
+                "task status",
+                "status of",
+                "payment integration",
+                "dashboard ui",
+                "customer module",
+            ]
+        ):
+            base_request = (
+                "Retrieve the project-level and task-level information "
+                "needed to answer the current question. Include the "
+                "specific project or task requested, its current status, "
+                "progress, pending/in-progress/completed state, delay "
+                "information, and related project details when available. "
+                "For task questions, return the actual task names and "
+                "their statuses from the available project records. "
+                "Do not replace task-level information with only a "
+                "high-level project summary. Do not invent information."
+            )
 
         # -----------------------------------------------------
         # Entity-specific context
@@ -1576,8 +2294,16 @@ class AIOrchestrator:
                         "\n\nSPECIFIC EMPLOYEE CONTEXT:\n"
                         f"The user is specifically asking about "
                         f"'{entity_name}'.\n\n"
-                        "Provide available employee or leave "
-                        "information for this person.\n"
+                        "Preserve the HR topic from the previous conversation "
+                        "when answering this employee-specific follow-up. "
+                        "If the previous topic was salary, provide the salary "
+                        "for this employee. If the previous topic was attendance, "
+                        "provide attendance information for this employee. "
+                        "If the previous topic was leave, provide leave information "
+                        "for this employee. If the previous topic was general "
+                        "employee information, provide the relevant employee details.\n"
+                        "Do not switch to an unrelated HR topic.\n"
+                        "Use only available HR data.\n"
                         "Do not invent information."
                     )
 
@@ -1789,20 +2515,103 @@ class AIOrchestrator:
     ):
         conversation_history = conversation_history or []
 
-        selected_agents = self.registry.find_relevant_agents(request)
+        selected_agents = self.get_agents_from_request(request)
 
         results = []
 
+        # =====================================================
+        # STRUCTURED AGENT-TO-AGENT COLLABORATION
+        # =====================================================
+
+        project_agent = None
+        sales_agent = None
+
         for agent in selected_agents:
 
-            result = self.execute_agent(
-                agent=agent,
+            if agent.name == "Project Agent":
+                project_agent = agent
+
+            elif agent.name == "Sales Agent":
+                sales_agent = agent
+        if project_agent and sales_agent:
+
+            print("=" * 60)
+            print("STRUCTURED COLLABORATION: PROJECT -> SALES")
+            print("=" * 60)
+
+            # First execute the primary Project Agent.
+            project_result = self.execute_agent(
+                agent=project_agent,
                 agent_request=request,
                 user=user,
                 credentials=credentials,
             )
+            # Project Agent requests relevant sales/customer
+            # information from Sales Agent.
+            collaboration_result = self.request_agent_collaboration(
+                requesting_agent=project_agent,
+                target_agent_name="Sales Agent",
+                collaboration_request=(
+                    "Provide the sales and customer information "
+                    "needed to evaluate the possible business impact "
+                    "of the projects mentioned in the user's request. "
+                    "Include relevant customers, pending orders, "
+                    "and pending follow-ups when available. "
+                    "Do not invent relationships between projects "
+                    "and customers or orders."
+                ),
+                user=user,
+                credentials=credentials,
+            )
+            # Keep the collaboration attached to the Project Agent
+            # result for structured agent-to-agent tracking.
+            project_result["collaboration"] = collaboration_result
 
-            results.append(result)
+            results.append(project_result)
+            # Also expose the Sales collaboration as a separate
+            # result so the final natural-response layer can use it.
+            if collaboration_result.get("status") == "success":
+                results.append(
+                    {
+                        "agent": "Sales Agent",
+                        "status": "success",
+                        "message": collaboration_result.get(
+                            "message",
+                            "Sales information retrieved through Project Agent collaboration.",
+                        ),
+                        "data": collaboration_result.get(
+                            "data",
+                            {},
+                        ),
+                    }
+                )
+
+            # Execute the other selected agents normally.
+            # Project Agent has already been executed above.
+            # Sales Agent contributed through structured collaboration.
+            for agent in selected_agents:
+                if agent.name in ["Project Agent", "Sales Agent"]:
+                    continue
+                result = self.execute_agent(
+                    agent=agent,
+                    agent_request=request,
+                    user=user,
+                    credentials=credentials,
+                )
+                results.append(result)
+        else:
+
+            # Existing behavior for all other multi-agent requests.
+            for agent in selected_agents:
+
+                result = self.execute_agent(
+                    agent=agent,
+                    agent_request=request,
+                    user=user,
+                    credentials=credentials,
+                )
+
+                results.append(result)
 
         fallback_response = self.build_combined_response(
             request=request,
@@ -1862,7 +2671,10 @@ class AIOrchestrator:
 
         previous_assistant = self.get_last_assistant_message(conversation_history)
 
-        previous_user = self.get_previous_user_message(conversation_history)
+        previous_user = self.get_previous_user_message(
+            conversation_history,
+            current_request=request,
+        )
 
         print(
             "PREVIOUS USER MESSAGE:",
@@ -1873,6 +2685,27 @@ class AIOrchestrator:
             "PREVIOUS ASSISTANT MESSAGE:",
             previous_assistant,
         )
+
+        # -----------------------------------------------------
+        # Ambiguous "those/these" pending reference
+        # -----------------------------------------------------
+        if self.is_ambiguous_pending_reference(
+            request=request,
+            conversation_history=conversation_history,
+        ):
+            return {
+                "status": "success",
+                "intent": "contextual_follow_up",
+                "agent": "Conversation Context",
+                "response": (
+                    "Do you mean the 3 pending sales follow-ups "
+                    "or the 2 pending orders?"
+                ),
+                "data": {
+                    "conversation_context_used": True,
+                    "clarification_required": True,
+                },
+            }
 
         # -----------------------------------------------------
         # 1. Entity context FIRST
@@ -1954,8 +2787,10 @@ class AIOrchestrator:
         # -----------------------------------------------------
         else:
 
-            current_agents = self.get_agents_from_conversation(conversation_history)
-
+            current_agents = self.get_agents_from_conversation(
+                conversation_history,
+                current_request=request,
+            )
             print("FOLLOW-UP ROUTING PRIORITY: CONVERSATION CONTEXT")
 
             print(
@@ -1971,11 +2806,24 @@ class AIOrchestrator:
             "which area",
             "which one",
             "needs attention",
+            "what needs my attention",
+            "what needs my attention first",
+            "what needs attention first",
+            "what needs attention most",
             "most attention",
             "what should i focus",
             "what should we focus",
             "what should i do",
             "what should we do",
+            "what should i attend to first",
+            "what should i prioritize",
+            "what should i prioritize first",
+            "what is most urgent",
+            "what is urgent",
+            "which needs attention",
+            "which needs attention first",
+            "what needs to be handled first",
+            "what should be handled first",
             "what next",
             "priorities",
             "priority",
@@ -1988,27 +2836,58 @@ class AIOrchestrator:
         )
 
         # -----------------------------------------------------
-        # 5. Management attention questions
+        # 5. Attention question handling
+        # -----------------------------------------------------
+        #
+        # Preserve the existing conversation context.
+        # Only use multiple management agents when there is
+        # no specific business context.
+        #
+        # Example:
+        # How many new leads are there?
+        # Tell me more about them.
+        # Which one needs attention?
+        #
+        # This must remain in the Sales context.
         # -----------------------------------------------------
 
         if is_attention_question:
 
-            management_names = [
-                "HR Agent",
-                "Project Agent",
-                "Sales Agent",
-                "Finance Agent",
-                "Calendar Agent",
-            ]
+            if current_agents:
 
-            management_agents = [
-                agent
-                for agent in self.registry.get_agents()
-                if agent.name in management_names
-            ]
+                print("ATTENTION ROUTING: PRESERVING EXISTING CONTEXT")
 
-            if management_agents:
-                current_agents = management_agents
+                print(
+                    "ATTENTION CONTEXT AGENTS:",
+                    [agent.name for agent in current_agents],
+                )
+
+            else:
+
+                management_names = [
+                    "HR Agent",
+                    "Project Agent",
+                    "Sales Agent",
+                    "Finance Agent",
+                    "Calendar Agent",
+                ]
+
+                management_agents = [
+                    agent
+                    for agent in self.registry.get_agents()
+                    if agent.name in management_names
+                ]
+
+                if management_agents:
+
+                    current_agents = management_agents
+
+                    print("ATTENTION ROUTING: MANAGEMENT OVERVIEW")
+
+                    print(
+                        "MANAGEMENT ATTENTION AGENTS:",
+                        [agent.name for agent in current_agents],
+                    )
 
         # -----------------------------------------------------
         # 6. No agent found
@@ -2066,6 +2945,36 @@ class AIOrchestrator:
                 entity_context=entity_context,
                 attention_question=is_attention_question,
             )
+
+            # Handle a reply to the previous clarification question.
+            if self.is_clarification_reply(
+                request,
+                conversation_history,
+            ):
+                request_lower = request.lower()
+                if "order" in request_lower:
+                    agent_request = (
+                        "The user clarified that they are asking about "
+                        "orders from the previous sales summary. "
+                        "Retrieve the actual order records and identify "
+                        "which orders are pending. Include the order ID, "
+                        "customer, amount, and status where available. "
+                        "Use the available business data and do not "
+                        "invent missing details."
+                    )
+                elif (
+                    "follow-up" in request_lower
+                    or "follow up" in request_lower
+                    or "followup" in request_lower
+                ):
+                    agent_request = (
+                        "The user clarified that they are asking about "
+                        "pending sales follow-ups from the previous "
+                        "sales summary. Retrieve the actual pending "
+                        "follow-up records and include the customer "
+                        "and pending duration where available. "
+                        "Do not invent missing details."
+                    )
 
             # Handle a short confirmation such as "yes"
             if self.is_confirmation_reply(request) and self.assistant_offered_details(
@@ -2725,12 +3634,28 @@ class AIOrchestrator:
             len(conversation_history),
         )
 
+        # =====================================================
+        # CHECK FOR A REAL PREVIOUS CONVERSATION TURN
+        # =====================================================
+        has_previous_conversation = any(
+            message.get("content", "").strip() != request.strip()
+            for message in conversation_history
+        )
+
         print(
-            "FOLLOW-UP DETECTED:",
-            self.is_follow_up_question(
+            "HAS PREVIOUS CONVERSATION:",
+            has_previous_conversation,
+        )
+        follow_up_detected = False
+
+        if has_previous_conversation:
+            follow_up_detected = self.is_follow_up_question(
                 request,
                 conversation_history,
-            ),
+            )
+        print(
+            "FOLLOW-UP DETECTED:",
+            follow_up_detected,
         )
 
         print("=" * 60)
@@ -2739,25 +3664,31 @@ class AIOrchestrator:
         # 1. CONTEXTUAL FOLLOW-UP
         # =====================================================
 
-        if conversation_history and (
-            self.is_follow_up_question(
+        if has_previous_conversation:
+            is_follow_up = self.is_follow_up_question(
                 request,
                 conversation_history,
             )
-            or (
-                self.is_confirmation_reply(request)
-                and self.assistant_offered_details(conversation_history)
+            is_confirmation = self.is_confirmation_reply(
+                request
+            ) and self.assistant_offered_details(conversation_history)
+            is_clarification = self.is_clarification_reply(
+                request,
+                conversation_history,
             )
-        ):
-            print("ROUTING: CONTEXTUAL FOLLOW-UP")
+            if is_follow_up or is_confirmation or is_clarification:
+                print("ROUTING: CONTEXTUAL FOLLOW-UP")
 
-            return self.process_follow_up_query(
-                request=request,
-                user=user,
-                role=role,
-                credentials=credentials,
-                conversation_history=conversation_history,
-            )
+                if is_clarification:
+                    print("CLARIFICATION REPLY DETECTED:", request)
+
+                return self.process_follow_up_query(
+                    request=request,
+                    user=user,
+                    role=role,
+                    credentials=credentials,
+                    conversation_history=conversation_history,
+                )
 
         # =====================================================
         # 2. MANAGEMENT QUERY
@@ -2774,6 +3705,182 @@ class AIOrchestrator:
                 credentials=credentials,
                 conversation_history=conversation_history,
             )
+
+        permission_engine = PermissionEngine()
+
+        # =====================================================
+        # ADMIN-ONLY AUDIT LOG REQUEST
+        # =====================================================
+
+        if any(
+            keyword in request.lower()
+            for keyword in [
+                "audit log",
+                "audit logs",
+                "auditlog",
+                "auditlogs",
+                "audit information",
+                "audit across users",
+                "audit information across users",
+            ]
+        ):
+
+            if not permission_engine.has_permission(
+                role,
+                "view_audit_logs",
+            ):
+                return {
+                    "status": "error",
+                    "intent": "Audit Logs",
+                    "agent": "Audit Logs",
+                    "response": "You do not have permission to view audit logs.",
+                }
+            # -------------------------------------------------
+            # Retrieve existing audit records
+            # -------------------------------------------------
+            audit_logs = AuditLog.objects.all().order_by("-timestamp")
+
+            audit_data = []
+            for log in audit_logs:
+
+                audit_data.append(
+                    {
+                        "id": log.id,
+                        "user": log.user,
+                        "agent": log.agent,
+                        "request": log.request,
+                        "data_accessed": log.data_accessed,
+                        "tool": log.tool,
+                        "action": log.action,
+                        "approval": log.approval,
+                        "result": log.result,
+                        "timestamp": log.timestamp.isoformat(),
+                    }
+                )
+            # -------------------------------------------------
+            # Fallback response
+            # -------------------------------------------------
+            fallback_response = (
+                f"I found {len(audit_data)} audit log records."
+                if audit_data
+                else "There are currently no audit log records."
+            )
+            # -------------------------------------------------
+            # Natural response
+            # -------------------------------------------------
+            natural_response = self.generate_natural_response(
+                request=request,
+                results=[
+                    {
+                        "status": "success",
+                        "agent": "Audit Logs",
+                        "message": fallback_response,
+                        "data": {
+                            "total_logs": len(audit_data),
+                            "audit_logs": audit_data,
+                        },
+                    }
+                ],
+                conversation_history=conversation_history,
+                fallback_response=fallback_response,
+            )
+            # -------------------------------------------------
+            # Record that the audit logs were accessed
+            # -------------------------------------------------
+
+            try:
+
+                create_audit_log(
+                    user=user,
+                    action="audit_logs_viewed",
+                    details={
+                        "request": request,
+                        "records_returned": len(audit_data),
+                    },
+                )
+
+            except Exception:
+                pass
+
+            return {
+                "status": "success",
+                "intent": "Audit Logs",
+                "agent": "Audit Logs",
+                "response": natural_response,
+                "data": {
+                    "total_logs": len(audit_data),
+                    "audit_logs": audit_data,
+                },
+            }
+        # =====================================================
+        # ADMIN-ONLY SENSITIVE INFORMATION REQUEST
+        # =====================================================
+
+        if any(
+            keyword in request.lower()
+            for keyword in [
+                "sensitive admin information",
+                "sensitive information",
+                "admin information",
+                "protected admin information",
+            ]
+        ):
+
+            if not permission_engine.has_permission(
+                role,
+                "view_audit_logs",
+            ):
+                return {
+                    "status": "error",
+                    "intent": "Sensitive Admin Information",
+                    "agent": "Admin Security",
+                    "response": "You do not have permission to access sensitive admin information.",
+                }
+
+            fallback_response = (
+                "As an administrator, you are authorized to access protected "
+                "business information including audit logs, employee information, "
+                "employee salary information, finance, sales, project, HR, "
+                "GitHub, Cloud Storage, and other configured business data."
+            )
+
+            natural_response = self.generate_natural_response(
+                request=request,
+                results=[
+                    {
+                        "status": "success",
+                        "agent": "Admin Security",
+                        "message": fallback_response,
+                        "data": {
+                            "role": role,
+                            "authorized": True,
+                            "protected_permissions": [
+                                "view_audit_logs",
+                                "view_employees",
+                                "view_employee_salary",
+                                "view_finance",
+                                "view_sales",
+                                "view_projects",
+                                "view_github",
+                                "view_cloud_storage",
+                            ],
+                        },
+                    }
+                ],
+                conversation_history=conversation_history,
+                fallback_response=fallback_response,
+            )
+
+            return {
+                "status": "success",
+                "intent": "Sensitive Admin Information",
+                "agent": "Admin Security",
+                "response": natural_response,
+                "data": {
+                    "role": role,
+                    "authorized": True,
+                },
+            }
 
         # =====================================================
         # 3. AGENT SELECTION
@@ -2861,7 +3968,7 @@ class AIOrchestrator:
 
         else:
 
-            selected_agents = self.registry.find_relevant_agents(request)
+            selected_agents = self.get_agents_from_request(request)
 
             print(
                 "ROUTING PRIORITY: REGISTRY RELEVANCE",
@@ -2971,6 +4078,8 @@ class AIOrchestrator:
         allowed = self.check_agent_permission(
             user=user,
             agent_name=agent_name,
+            agent=agent,
+            agent_request=request,
         )
 
         if not allowed:

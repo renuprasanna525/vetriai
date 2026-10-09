@@ -85,7 +85,7 @@ class DeveloperAgent(BaseAgent):
         if not any(keyword in request_lower for keyword in developer_keywords):
             return {
                 "agent": self.name,
-                "status": "error",
+                "status": "unsupported",
                 "data": {},
                 "message": (
                     "The requested developer information " "is not currently supported."

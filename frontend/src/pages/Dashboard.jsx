@@ -50,12 +50,13 @@ function Dashboard() {
   if (loading) {
     return (
       <main className="container-fluid px-4 py-4">
-        <div className="text-center py-5">
+        <div className="dashboard-loading">
 
-          <div
-            className="spinner-border text-primary"
-            role="status"
-          >
+          <div className="dashboard-loading-icon">
+            <i className="bi bi-bar-chart-line"></i>
+          </div>
+
+          <div className="spinner-border text-primary mt-3" role="status">
             <span className="visually-hidden">
               Loading...
             </span>
@@ -427,9 +428,9 @@ function Dashboard() {
 
         <StatCard
           title="Workload"
-          value="—"
+          value={dashboard.workload?.active_tasks ?? 0}
           icon="bi-bar-chart"
-          description="Workload data not available"
+          description={`${dashboard.workload?.active_tasks ?? 0} active tasks`}
         />
 
 
@@ -441,7 +442,483 @@ function Dashboard() {
         />
 
       </div>
+      {/* Project Status Analytics */}
+      <div className="row g-4 mb-4">
 
+        <div className="col-12">
+
+          <DashboardCard title="Project Status">
+
+            <div className="row text-center">
+
+              <div className="col-12 col-md-4 mb-3 mb-md-0">
+                <div className="p-3 border rounded project-status-card">
+
+                  <div className="dashboard-project-status-icon">
+                    <i className="bi bi-play-circle"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {Number(projectStatus.active_projects) || 0}
+                  </h3>
+
+                  <div className="text-muted">
+                    Active Projects
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="col-12 col-md-4 mb-3 mb-md-0">
+                <div className="p-3 border rounded project-status-card">
+
+                  <div className="dashboard-project-status-icon">
+                    <i className="bi bi-check-circle"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {Number(projectStatus.completed_projects) || 0}
+                  </h3>
+
+                  <div className="text-muted">
+                    Completed Projects
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="col-12 col-md-4">
+                <div className="p-3 border rounded project-status-card">
+
+                  <div className="dashboard-project-status-icon">
+                    <i className="bi bi-exclamation-circle"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {Number(projectStatus.delayed_projects) || 0}
+                  </h3>
+
+                  <div className="text-muted">
+                    Delayed Projects
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
+
+          </DashboardCard>
+
+        </div>
+
+      </div>
+      {/* Financial Analytics */}
+      <div className="row g-4 mb-4">
+
+        <div className="col-12">
+
+          <DashboardCard title="Financial Overview">
+
+            <div className="row text-center">
+
+              <div className="col-12 col-md-4 mb-3 mb-md-0">
+                <div className="p-3 border rounded financial-card">
+
+                  <div className="financial-icon">
+                    <i className="bi bi-arrow-down-left"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {formatCurrency(finance.total_revenue)}
+                  </h3>
+
+                  <div className="text-muted">
+                    Total Revenue
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="col-12 col-md-4 mb-3 mb-md-0">
+                <div className="p-3 border rounded financial-card">
+
+                  <div className="financial-icon">
+                    <i className="bi bi-arrow-up-right"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {formatCurrency(finance.total_expenses)}
+                  </h3>
+
+                  <div className="text-muted">
+                    Total Expenses
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="col-12 col-md-4">
+                <div className="p-3 border rounded financial-card">
+
+                  <div className="financial-icon">
+                    <i className="bi bi-graph-up-arrow"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {formatCurrency(finance.net_profit)}
+                  </h3>
+
+                  <div className="text-muted">
+                    Net Profit
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
+
+          </DashboardCard>
+
+        </div>
+
+      </div>
+      {/* Sales Analytics */}
+      <div className="row g-4 mb-4">
+
+        <div className="col-12">
+
+          <DashboardCard title="Sales Overview">
+
+            <div className="row text-center">
+
+              <div className="col-6 col-lg-3 mb-3 mb-lg-0">
+                <div className="p-3 border rounded sales-card">
+
+                  <div className="sales-icon">
+                    <i className="bi bi-person-plus"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {Number(sales.total_leads) || 0}
+                  </h3>
+
+                  <div className="text-muted">
+                    Total Leads
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="col-6 col-lg-3 mb-3 mb-lg-0">
+                <div className="p-3 border rounded sales-card">
+
+                  <div className="sales-icon">
+                    <i className="bi bi-person-check"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {Number(sales.new_leads) || 0}
+                  </h3>
+
+                  <div className="text-muted">
+                    New Leads
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="col-6 col-lg-3">
+                <div className="p-3 border rounded sales-card">
+
+                  <div className="sales-icon">
+                    <i className="bi bi-clock-history"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {pendingFollowups.length}
+                  </h3>
+
+                  <div className="text-muted">
+                    Pending Follow-ups
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="col-6 col-lg-3">
+                <div className="p-3 border rounded sales-card">
+
+                  <div className="sales-icon">
+                    <i className="bi bi-cart-check"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {Number(pendingOrders.pending_orders) || 0}
+                  </h3>
+
+                  <div className="text-muted">
+                    Pending Orders
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
+
+          </DashboardCard>
+
+        </div>
+
+      </div>
+
+      {/* Employee & HR Analytics */}
+      <div className="row g-4 mb-4">
+
+        <div className="col-12">
+
+          <DashboardCard title="Employee & HR Overview">
+
+            <div className="row text-center">
+
+              <div className="col-6 col-lg-3 mb-3 mb-lg-0">
+                <div className="p-3 border rounded hr-card">
+
+                  <div className="hr-icon">
+                    <i className="bi bi-people"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {totalEmployees}
+                  </h3>
+
+                  <div className="text-muted">
+                    Total Employees
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="col-6 col-lg-3 mb-3 mb-lg-0">
+                <div className="p-3 border rounded hr-card">
+
+                  <div className="hr-icon">
+                    <i className="bi bi-person-check"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {activeEmployees}
+                  </h3>
+
+                  <div className="text-muted">
+                    Active Employees
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="col-6 col-lg-3">
+                <div className="p-3 border rounded hr-card">
+
+                  <div className="hr-icon">
+                    <i className="bi bi-calendar-x"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {totalOnLeave}
+                  </h3>
+
+                  <div className="text-muted">
+                    On Leave
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="col-6 col-lg-3">
+                <div className="p-3 border rounded hr-card">
+
+                  <div className="hr-icon">
+                    <i className="bi bi-calendar-check"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {Number(
+                      dashboard.attendance?.present
+                    ) || 0}
+                  </h3>
+
+                  <div className="text-muted">
+                    Present Today
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
+
+          </DashboardCard>
+
+        </div>
+
+      </div>
+      {/* Task & Workload Analytics */}
+      <div className="row g-4 mb-4">
+
+        <div className="col-12">
+
+          <DashboardCard title="Task & Workload Overview">
+
+            <div className="row text-center">
+
+              <div className="col-6 col-lg-3 mb-3 mb-lg-0">
+                <div className="p-3 border rounded workload-card">
+
+                  <div className="workload-icon">
+                    <i className="bi bi-list-task"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {dashboard.workload?.total_tasks ?? 0}
+                  </h3>
+
+                  <div className="text-muted">
+                    Total Tasks
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="col-6 col-lg-3 mb-3 mb-lg-0">
+                <div className="p-3 border rounded workload-card">
+
+                  <div className="workload-icon">
+                    <i className="bi bi-hourglass-split"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {dashboard.workload?.active_tasks ?? 0}
+                  </h3>
+
+                  <div className="text-muted">
+                    Active Tasks
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="col-6 col-lg-3">
+                <div className="p-3 border rounded workload-card">
+
+                  <div className="workload-icon">
+                    <i className="bi bi-check2-circle"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {dashboard.workload?.completed_tasks ?? 0}
+                  </h3>
+
+                  <div className="text-muted">
+                    Completed Tasks
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="col-6 col-lg-3">
+                <div className="p-3 border rounded workload-card">
+
+                  <div className="workload-icon">
+                    <i className="bi bi-exclamation-triangle"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {pendingTaskCount}
+                  </h3>
+
+                  <div className="text-muted">
+                    Pending Tasks
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
+
+          </DashboardCard>
+
+        </div>
+
+      </div>
+      {/* Customer Analytics */}
+      <div className="row g-4 mb-4">
+
+        <div className="col-12">
+
+          <DashboardCard title="Customer Overview">
+
+            <div className="row text-center">
+
+              <div className="col-12 col-md-4 mb-3 mb-md-0">
+                <div className="p-3 border rounded customer-card">
+
+                  <div className="customer-icon">
+                    <i className="bi bi-people"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {Number(customers.total_customers) || 0}
+                  </h3>
+
+                  <div className="text-muted">
+                    Total Customers
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="col-12 col-md-4 mb-3 mb-md-0">
+                <div className="p-3 border rounded customer-card">
+
+                  <div className="customer-icon">
+                    <i className="bi bi-person-check"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {Number(customers.total_customers) || 0}
+                  </h3>
+
+                  <div className="text-muted">
+                    Active Customers
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="col-12 col-md-4">
+                <div className="p-3 border rounded customer-card">
+
+                  <div className="customer-icon">
+                    <i className="bi bi-person-lines-fill"></i>
+                  </div>
+
+                  <h3 className="mb-1">
+                    {pendingFollowups.length}
+                  </h3>
+
+                  <div className="text-muted">
+                    Customers With Follow-ups
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
+
+          </DashboardCard>
+
+        </div>
+
+      </div>
 
       {/* Business Activity + Pending Tasks */}
       <div className="row g-4 mb-4">

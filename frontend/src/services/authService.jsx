@@ -1,8 +1,6 @@
+
 import { authFetch } from "./authFetch";
-
-const API_BASE_URL =
-    "https://vetri-ai-backend-i3pw.onrender.com/api";
-
+import { API_BASE_URL } from "./apiConfig";
 
 export async function loginUser(username, password) {
     const response = await fetch(
@@ -29,7 +27,6 @@ export async function loginUser(username, password) {
 
     return data;
 }
-
 
 export async function getCurrentUser() {
     const response = await authFetch(

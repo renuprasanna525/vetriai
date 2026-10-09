@@ -21,6 +21,7 @@ class GitHubAgent(BaseAgent):
             "git",
             "repository",
             "repositories",
+            "repository",
             "repo",
             "repos",
             "pull request",
@@ -47,6 +48,31 @@ class GitHubAgent(BaseAgent):
     def process(self, request, user, credentials=None):
 
         request_lower = request.lower()
+        # -----------------------------------------
+        # Unsupported External GitHub Requests
+        # -----------------------------------------
+
+        unsupported_github_keywords = [
+            "repository",
+            "repositories",
+            "repo",
+            "repos",
+            "pull request",
+            "pull requests",
+            "issue",
+            "issues",
+        ]
+        if any(keyword in request_lower for keyword in unsupported_github_keywords):
+            return {
+                "agent": self.name,
+                "status": "unsupported",
+                "data": {},
+                "message": (
+                    "The requested GitHub repository, "
+                    "issue, or pull request information "
+                    "is not currently supported."
+                ),
+            }
 
         # -----------------------------------------
         # Get GitHub Repository Data
@@ -69,11 +95,79 @@ class GitHubAgent(BaseAgent):
             )
 
             # -----------------------------------------
+            # Detect requested GitHub categories
+            # -----------------------------------------
+
+            wants_issues = "issue" in request_lower or "issues" in request_lower
+
+            wants_pull_requests = (
+                "pull request" in request_lower
+                or "pull requests" in request_lower
+                or " pr " in f" {request_lower} "
+            )
+
+            wants_repositories = (
+                "repository" in request_lower
+                or "repositories" in request_lower
+                or "repo" in request_lower
+                or "repos" in request_lower
+            )
+
+            # -----------------------------------------
+            # Multiple GitHub categories
+            # -----------------------------------------
+
+            requested_categories = sum(
+                [
+                    wants_repositories,
+                    wants_issues,
+                    wants_pull_requests,
+                ]
+            )
+            print(
+                "GITHUB CATEGORY DEBUG:",
+                {
+                    "request": request_lower,
+                    "wants_repositories": wants_repositories,
+                    "wants_issues": wants_issues,
+                    "wants_pull_requests": wants_pull_requests,
+                    "requested_categories": requested_categories,
+                },
+            )
+
+            if requested_categories > 1:
+
+                parts = []
+                response_data = {}
+
+                if wants_repositories:
+                    parts.append(f"GitHub repositories: {repositories}")
+                    response_data["repositories"] = repositories
+
+                if wants_issues:
+                    parts.append(f"Open GitHub issues: {open_issues}")
+                    response_data["open_issues"] = open_issues
+
+                if wants_pull_requests:
+                    parts.append(f"Open GitHub pull requests: " f"{open_pull_requests}")
+                    response_data["open_pull_requests"] = open_pull_requests
+
+                message = "\n".join(parts)
+
+                return {
+                    "agent": self.name,
+                    "status": "success",
+                    "data": response_data,
+                    "message": message,
+                }
+
+            # -----------------------------------------
             # Focused: Open Issues
             # -----------------------------------------
 
-            if "issue" in request_lower or "issues" in request_lower:
-                message = f"There are {open_issues} open GitHub issues."
+            if wants_issues:
+
+                message = f"There are {open_issues} " f"open GitHub issues."
 
                 return {
                     "agent": self.name,
@@ -86,13 +180,10 @@ class GitHubAgent(BaseAgent):
             # Focused: Pull Requests
             # -----------------------------------------
 
-            if (
-                "pull request" in request_lower
-                or "pull requests" in request_lower
-                or " pr" in f" {request_lower}"
-            ):
+            if wants_pull_requests:
+
                 message = (
-                    f"There are {open_pull_requests} open " f"GitHub pull requests."
+                    f"There are {open_pull_requests} " f"open GitHub pull requests."
                 )
 
                 return {
@@ -106,14 +197,9 @@ class GitHubAgent(BaseAgent):
             # Focused: Repository Count
             # -----------------------------------------
 
-            if (
-                "repository" in request_lower
-                or "repositories" in request_lower
-                or "repo" in request_lower
-                or "repos" in request_lower
-                or "how many repositories" in request_lower
-            ):
-                message = f"There are {repositories} GitHub repositories."
+            if wants_repositories:
+
+                message = f"There are {repositories} " f"GitHub repositories."
 
                 return {
                     "agent": self.name,
@@ -131,6 +217,7 @@ class GitHubAgent(BaseAgent):
                 or "deployment" in request_lower
                 or "deploy" in request_lower
             ):
+
                 message = (
                     "Cloud deployment information is "
                     "currently available as an MVP feature."
@@ -144,7 +231,7 @@ class GitHubAgent(BaseAgent):
                 }
 
             # -----------------------------------------
-            # GitHub Repository Summary
+            # Unsupported GitHub Summary / Status
             # -----------------------------------------
 
             if (
@@ -153,19 +240,15 @@ class GitHubAgent(BaseAgent):
                 or "repository status" in request_lower
                 or "status" in request_lower
             ):
-                message = (
-                    "GitHub Repository Status:\n"
-                    f"Repositories: {repositories}\n"
-                    f"Open Issues: {open_issues}\n"
-                    f"Open Pull Requests: "
-                    f"{open_pull_requests}"
-                )
 
                 return {
                     "agent": self.name,
-                    "status": "success",
-                    "data": data,
-                    "message": message,
+                    "status": "unsupported",
+                    "data": {},
+                    "message": (
+                        "GitHub repository, issue, and pull request "
+                        "information is not currently supported."
+                    ),
                 }
 
         # -----------------------------------------
@@ -174,7 +257,7 @@ class GitHubAgent(BaseAgent):
 
         return {
             "agent": self.name,
-            "status": "error",
+            "status": "unsupported",
             "data": {},
             "message": (
                 "The requested GitHub or Cloud "

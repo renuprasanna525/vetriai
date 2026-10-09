@@ -1,6 +1,4 @@
-const API_BASE_URL =
-    "https://vetri-ai-backend-i3pw.onrender.com/api";
-
+import { API_BASE_URL } from "./apiConfig";
 
 export async function refreshAccessToken() {
     const refreshToken = localStorage.getItem("refresh_token");
@@ -34,7 +32,6 @@ export async function refreshAccessToken() {
 
     return data.access;
 }
-
 
 export async function authFetch(url, options = {}) {
     let accessToken = localStorage.getItem("access_token");

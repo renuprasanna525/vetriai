@@ -3,57 +3,14 @@ import { useEffect, useState } from "react";
 import {
     getNotifications,
     markNotificationRead,
+    deleteNotification,
 } from "../services/notificationService";
 
-import { sendNotificationEmail } from "../services/emailService";
 
 function Notifications() {
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-
-    async function sendEmailForNotification(notification) {
-        // Only send emails for email-channel notifications
-        if (notification.channel !== "email") {
-            return;
-        }
-
-        // Prevent duplicate emails
-        const sentKey = `notification_email_sent_${notification.id} `;
-
-        if (localStorage.getItem(sentKey)) {
-            return;
-        }
-
-        try {
-            const result = await sendNotificationEmail({
-                to_name: notification.username,
-                to_email: notification.email,
-                message: notification.message,
-                notification_type: notification.notification_type,
-                notification_time: new Date(
-                    notification.created_at
-                ).toLocaleString(),
-            });
-
-            if (result.success) {
-                localStorage.setItem(sentKey, "true");
-
-                console.log(
-                    `Email sent successfully for notification ${notification.id}`
-                );
-            } else {
-                console.error(
-                    `Email failed for notification ${notification.id}`
-                );
-            }
-        } catch (err) {
-            console.error(
-                `EmailJS error for notification ${notification.id}: `,
-                err
-            );
-        }
-    }
 
     async function loadNotifications() {
         try {
@@ -70,10 +27,6 @@ function Notifications() {
 
             setNotifications(data);
 
-            // Send EmailJS emails only for email-channel notifications
-            for (const notification of data) {
-                await sendEmailForNotification(notification);
-            }
         } catch (err) {
             setError(err.message);
         } finally {
@@ -105,6 +58,26 @@ function Notifications() {
                         : notification
                 )
             );
+        } catch (err) {
+            setError(err.message);
+        }
+    }
+    async function handleDelete(notificationId) {
+        try {
+            const accessToken = localStorage.getItem("access_token");
+
+            if (!accessToken) {
+                throw new Error("You are not logged in.");
+            }
+
+            await deleteNotification(notificationId, accessToken);
+
+            setNotifications((currentNotifications) =>
+                currentNotifications.filter(
+                    (notification) => notification.id !== notificationId
+                )
+            );
+            window.dispatchEvent(new Event("notificationsUpdated"));
         } catch (err) {
             setError(err.message);
         }
@@ -237,30 +210,42 @@ function Notifications() {
                                             </span>
 
                                         </div>
+                                        <div className="notification-actions">
 
-                                        {!notification.is_read ? (
+                                            {!notification.is_read ? (
 
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-primary"
+                                                    onClick={() =>
+                                                        handleMarkAsRead(
+                                                            notification.id
+                                                        )
+                                                    }
+                                                >
+                                                    <i className="bi bi-check2 me-1"></i>
+                                                    Mark as Read
+                                                </button>
+
+                                            ) : (
+
+                                                <span className="badge text-bg-success">
+                                                    <i className="bi bi-check-circle me-1"></i>
+                                                    Read
+                                                </span>
+
+                                            )}
                                             <button
                                                 type="button"
-                                                className="btn btn-sm btn-primary"
+                                                className="btn btn-sm btn-outline-danger notification-delete-btn"
                                                 onClick={() =>
-                                                    handleMarkAsRead(
-                                                        notification.id
-                                                    )
+                                                    handleDelete(notification.id)
                                                 }
                                             >
-                                                <i className="bi bi-check2 me-1"></i>
-                                                Mark as Read
+                                                <i className="bi bi-trash me-1"></i>
+                                                Delete
                                             </button>
-
-                                        ) : (
-
-                                            <span className="badge text-bg-success">
-                                                <i className="bi bi-check-circle me-1"></i>
-                                                Read
-                                            </span>
-
-                                        )}
+                                        </div>
 
                                     </div>
 

@@ -2,8 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./AIChat.css";
 import { authFetch } from "../services/authFetch";
+import { API_BASE_URL } from "../services/apiConfig";
 
-const API_BASE_URL = "https://vetri-ai-backend-i3pw.onrender.com/api";
 const AI_BOT_IMAGE = "/ai-bot.gif";
 const NEW_CHAT_KEY = "vetri_ai_new_chat";
 
@@ -63,7 +63,19 @@ function AIChat() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [historyError, setHistoryError] = useState("");
+  const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [renameTitle, setRenameTitle] = useState("");
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const filteredConversations = conversations.filter((conversation) =>
+    getConversationTitle(conversation)
+      .toLowerCase()
+      .includes(searchQuery.trim().toLowerCase())
+  );
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -202,6 +214,48 @@ function AIChat() {
 
     loadConversation(id);
   };
+  const deleteConversation = async (id) => {
+    if (isLoading || isLoadingConversation) return;
+
+    const conversation = conversations.find((item) => item.id === id);
+
+    if (!conversation) return;
+
+    const confirmed = window.confirm(
+      `Delete "${getConversationTitle(conversation)}"? This conversation and its messages will be permanently deleted.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setHistoryError("");
+
+      const response = await authFetch(
+        `${API_BASE_URL}/conversations/${id}/`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to delete conversation.");
+      }
+
+      setConversations((previous) =>
+        previous.filter((item) => item.id !== id)
+      );
+
+      if (id === conversationId) {
+        handleNewChat();
+      }
+    } catch (error) {
+      console.error("Delete Conversation Error:", error);
+      setHistoryError(
+        "Unable to delete this conversation. Please try again."
+      );
+    }
+  };
 
   const handleSend = async () => {
     const trimmedQuestion = question.trim();
@@ -298,6 +352,94 @@ function AIChat() {
       handleSend();
     }
   };
+  const handleHeaderMenuToggle = () => {
+    setIsHeaderMenuOpen((open) => !open);
+  };
+  const handleRenameConversation = () => {
+    if (!conversationId || isLoading || isLoadingConversation) return;
+
+    const conversation = conversations.find(
+      (item) => item.id === conversationId
+    );
+
+    if (!conversation) return;
+
+    setRenameTitle(getConversationTitle(conversation));
+    setIsHeaderMenuOpen(false);
+    setIsRenameOpen(true);
+  };
+  const handleSearchConversations = () => {
+    setIsHeaderMenuOpen(false);
+    setIsSearchOpen(true);
+  };
+  const saveConversationRename = async () => {
+    if (!conversationId || isRenaming) return;
+
+    const trimmedTitle = renameTitle.trim();
+
+    if (!trimmedTitle) {
+      setHistoryError("Conversation title cannot be empty.");
+      return;
+    }
+
+    if (trimmedTitle.length > 255) {
+      setHistoryError(
+        "Conversation title cannot exceed 255 characters."
+      );
+      return;
+    }
+
+    try {
+      setIsRenaming(true);
+      setHistoryError("");
+
+      const response = await authFetch(
+        `${API_BASE_URL}/conversations/${conversationId}/`,
+        {
+          method: "PATCH",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: trimmedTitle,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Failed to rename conversation."
+        );
+      }
+
+      setConversations((previous) =>
+        previous.map((conversation) =>
+          conversation.id === conversationId
+            ? {
+              ...conversation,
+              title: data.conversation?.title || trimmedTitle,
+              updated_at:
+                data.conversation?.updated_at ||
+                conversation.updated_at,
+            }
+            : conversation
+        )
+      );
+
+      setIsRenameOpen(false);
+      setRenameTitle("");
+    } catch (error) {
+      console.error("Rename Conversation Error:", error);
+      setHistoryError(
+        "Unable to rename this conversation. Please try again."
+      );
+    } finally {
+      setIsRenaming(false);
+    }
+  };
 
   const handleSuggestion = (text) => {
     setQuestion(text);
@@ -358,6 +500,34 @@ function AIChat() {
             </button>
           </div>
 
+          {isSearchOpen && (
+            <div className="ai-history-search">
+              <div className="ai-history-search-input-wrapper">
+                <i className="bi bi-search"></i>
+
+                <input
+                  type="text"
+                  placeholder="Search conversations..."
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  autoFocus
+                />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setIsSearchOpen(false);
+                  }}
+                  aria-label="Close conversation search"
+                  title="Close search"
+                >
+                  <i className="bi bi-x-lg"></i>
+                </button>
+              </div>
+            </div>
+          )}
+
           <button
             type="button"
             className="ai-history-new-chat"
@@ -404,29 +574,46 @@ function AIChat() {
                 <small>Your chats will appear here.</small>
               </div>
             )}
+            {!isLoadingHistory &&
+              !historyError &&
+              conversations.length > 0 &&
+              filteredConversations.length === 0 && (
+                <div className="ai-history-empty">
+                  <i className="bi bi-search"></i>
+                  <span>No conversations found</span>
+                  <small>Try a different search term.</small>
+                </div>
+              )}
 
             {!isLoadingHistory &&
-              conversations.map((conversation) => (
-                <button
-                  type="button"
+              filteredConversations.map((conversation) => (
+                <div
                   key={conversation.id}
-                  className={`ai-history-item ${conversation.id === conversationId ? "active" : ""
+                  className={`ai-history-item-wrapper ${conversation.id === conversationId ? "active" : ""
                     }`}
-                  onClick={() => handleSelectConversation(conversation.id)}
-                  disabled={isLoadingConversation || isLoading}
                 >
-                  <i className="bi bi-chat-left-text"></i>
-                  <span className="ai-history-item-content">
-                    <span className="ai-history-item-title">
-                      {getConversationTitle(conversation)}
+                  <button
+                    type="button"
+                    className={`ai-history-item ${conversation.id === conversationId ? "active" : ""
+                      }`}
+                    onClick={() => handleSelectConversation(conversation.id)}
+                    disabled={isLoadingConversation || isLoading}
+                  >
+                    <i className="bi bi-chat-left-text"></i>
+
+                    <span className="ai-history-item-content">
+                      <span className="ai-history-item-title">
+                        {getConversationTitle(conversation)}
+                      </span>
+
+                      <span className="ai-history-item-date">
+                        {formatConversationDate(
+                          conversation.updated_at || conversation.created_at
+                        )}
+                      </span>
                     </span>
-                    <span className="ai-history-item-date">
-                      {formatConversationDate(
-                        conversation.updated_at || conversation.created_at
-                      )}
-                    </span>
-                  </span>
-                </button>
+                  </button>
+                </div>
               ))}
           </div>
 
@@ -462,8 +649,53 @@ function AIChat() {
                 <i className="bi bi-plus-lg"></i>
                 <span>New Chat</span>
               </button>
-              <div className="ai-chat-header-icon" title="Vetri AI">
-                <i className="bi bi-three-dots-vertical"></i>
+              <div className="ai-chat-header-menu">
+                <button
+                  type="button"
+                  className="ai-chat-header-icon"
+                  onClick={handleHeaderMenuToggle}
+                  aria-label="Conversation options"
+                  aria-expanded={isHeaderMenuOpen}
+                  title="Conversation options"
+                >
+                  <i className="bi bi-three-dots-vertical"></i>
+                </button>
+
+                {isHeaderMenuOpen && (
+                  <div className="ai-chat-options-menu">
+                    <button
+                      type="button"
+                      onClick={handleRenameConversation}
+                      disabled={!conversationId || isLoading || isLoadingConversation}
+                    >
+                      <i className="bi bi-pencil"></i>
+                      <span>Rename</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleSearchConversations}
+                    >
+                      <i className="bi bi-search"></i>
+                      <span>Search</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsHeaderMenuOpen(false);
+
+                        if (conversationId) {
+                          deleteConversation(conversationId);
+                        }
+                      }}
+                      disabled={!conversationId || isLoading || isLoadingConversation}
+                    >
+                      <i className="bi bi-trash3"></i>
+                      <span>Delete</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -514,8 +746,7 @@ function AIChat() {
             {messages.map((message, index) => (
               <div
                 key={message.id || `${message.sender}-${index}`}
-                className={`ai-message-row ${message.sender === "user" ? "user-message-row" : "ai-message-row-left"
-                  }`}
+                className={`ai-message-row ${message.sender === "user" ? "user-message-row" : "ai-message-row-left"}`}
               >
                 {message.sender === "ai" && (
                   <div className="message-avatar ai-avatar">
@@ -524,8 +755,7 @@ function AIChat() {
                 )}
 
                 <div
-                  className={`ai-message ${message.sender === "user" ? "user-message" : "assistant-message"
-                    }`}
+                  className={`ai-message ${message.sender === "user" ? "user-message" : "assistant-message"}`}
                 >
                   <div className="message-name">
                     {message.sender === "user" ? "You" : "Vetri AI"}
@@ -610,6 +840,73 @@ function AIChat() {
           </div>
         </section>
       </div>
+      {isRenameOpen && (
+        <div className="ai-rename-overlay">
+          <div className="ai-rename-dialog">
+            <div className="ai-rename-header">
+              <div>
+                <h3>Rename conversation</h3>
+                <p>Choose a name for this conversation.</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRenameOpen(false);
+                  setRenameTitle("");
+                }}
+                disabled={isRenaming}
+                aria-label="Close rename dialog"
+              >
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+
+            <div className="ai-rename-body">
+              <label htmlFor="conversation-rename-input">
+                Conversation name
+              </label>
+
+              <input
+                id="conversation-rename-input"
+                type="text"
+                value={renameTitle}
+                onChange={(event) => setRenameTitle(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    saveConversationRename();
+                  }
+                }}
+                maxLength={255}
+                autoFocus
+                disabled={isRenaming}
+              />
+            </div>
+
+            <div className="ai-rename-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRenameOpen(false);
+                  setRenameTitle("");
+                }}
+                disabled={isRenaming}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={saveConversationRename}
+                disabled={!renameTitle.trim() || isRenaming}
+              >
+                {isRenaming ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

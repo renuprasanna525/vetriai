@@ -214,5 +214,21 @@ DEFAULT_FROM_EMAIL = os.getenv(
     "DEFAULT_FROM_EMAIL",
     EMAIL_HOST_USER,
 )
+# WhatsApp Configuration
+
+WHATSAPP_API_URL = os.getenv(
+    "WHATSAPP_API_URL",
+    "",
+)
+
+WHATSAPP_ACCESS_TOKEN = os.getenv(
+    "WHATSAPP_ACCESS_TOKEN",
+    "",
+)
+
+WHATSAPP_PHONE_NUMBER_ID = os.getenv(
+    "WHATSAPP_PHONE_NUMBER_ID",
+    "",
+)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

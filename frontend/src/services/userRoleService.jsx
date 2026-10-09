@@ -1,8 +1,6 @@
+
 import { authFetch } from "./authFetch";
-
-const API_BASE_URL =
-    "https://vetri-ai-backend-i3pw.onrender.com/api";
-
+import { API_BASE_URL } from "./apiConfig";
 
 export async function getUserRoles() {
     const response = await authFetch(

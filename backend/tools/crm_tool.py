@@ -17,14 +17,17 @@ class CRMTool:
                         {
                             "customer": "ABC Technologies",
                             "days_pending": 4,
+                            "priority": "Medium",
                         },
                         {
                             "customer": "XYZ Solutions",
                             "days_pending": 3,
+                            "priority": "Medium",
                         },
                         {
                             "customer": "Global Systems",
                             "days_pending": 7,
+                            "priority": "High",
                         },
                     ]
                 },
@@ -118,7 +121,7 @@ class CRMTool:
                     "pending_orders": 2,
                 },
             }
-        
+
         return {
             "status": "error",
             "message": "CRM action not supported.",

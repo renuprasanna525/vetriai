@@ -42,6 +42,7 @@ class PermissionEngine:
             "view_cloud_storage",
         },
         "admin": {
+            "view_audit_logs",
             "view_sales",
             "view_leads",
             "view_customers",

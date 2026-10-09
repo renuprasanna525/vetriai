@@ -1,3 +1,5 @@
+import re
+
 from .base_agent import BaseAgent
 from tools.cloud_storage_tool import CloudStorageTool
 
@@ -37,7 +39,10 @@ class CloudStorageAgent(BaseAgent):
         request_lower = request.lower()
 
         return any(
-            keyword in request_lower
+            re.search(
+                rf"\b{re.escape(keyword)}\b",
+                request_lower,
+            )
             for keyword in cloud_storage_keywords
         )
 
@@ -45,7 +50,6 @@ class CloudStorageAgent(BaseAgent):
         return "view_cloud_storage"
 
     def process(self, request, user, credentials=None):
-
         request_lower = request.lower()
 
         # -----------------------------------------
@@ -55,15 +59,12 @@ class CloudStorageAgent(BaseAgent):
             "storage summary" in request_lower
             or "storage usage" in request_lower
             or "storage used" in request_lower
-            or "cloud storage" in request_lower
         ):
-
             result = self.cloud_storage_tool.execute(
                 "get_storage_summary",
                 user,
                 credentials=credentials,
             )
-
             if result.get("status") == "success":
 
                 data = result.get("data", {})
@@ -84,122 +85,32 @@ class CloudStorageAgent(BaseAgent):
                 }
 
         # -----------------------------------------
-        # Recent Files
+        # Unsupported File / Document Requests
         # -----------------------------------------
-        if "recent" in request_lower and "file" in request_lower:
+        if (
+            "file" in request_lower
+            or "document" in request_lower
+            or "folder" in request_lower
+        ):
 
-            result = self.cloud_storage_tool.execute(
-                "get_recent_files",
-                user,
-                credentials=credentials,
-            )
-
-            if result.get("status") == "success":
-
-                data = result.get("data", {})
-                files = data.get("recent_files", [])
-
-                if files:
-                    file_lines = [
-                        f"{item['name']} - {item['updated']}"
-                        for item in files
-                    ]
-
-                    message = (
-                        "Recent Cloud Files:\n"
-                        + "\n".join(file_lines)
-                    )
-                else:
-                    message = "There are no recent cloud files."
-
-                return {
-                    "agent": self.name,
-                    "status": "success",
-                    "data": data,
-                    "message": message,
-                }
-
+            return {
+                "agent": self.name,
+                "status": "unsupported",
+                "data": {},
+                "message": (
+                    "The requested cloud storage file, "
+                    "document, or folder information "
+                    "is not currently supported."
+                ),
+            }
         # -----------------------------------------
-        # Folders
-        # -----------------------------------------
-        if "folder" in request_lower:
-
-            result = self.cloud_storage_tool.execute(
-                "get_folders",
-                user,
-                credentials=credentials,
-            )
-
-            if result.get("status") == "success":
-
-                data = result.get("data", {})
-                folders = data.get("folders", [])
-
-                folder_names = [
-                    folder["name"]
-                    for folder in folders
-                ]
-
-                message = (
-                    f"There are {len(folder_names)} "
-                    "main cloud storage folders: "
-                    + ", ".join(folder_names)
-                    + "."
-                )
-
-                return {
-                    "agent": self.name,
-                    "status": "success",
-                    "data": data,
-                    "message": message,
-                }
-
-        # -----------------------------------------
-        # Files
-        # -----------------------------------------
-        if "file" in request_lower or "document" in request_lower:
-
-            result = self.cloud_storage_tool.execute(
-                "get_files",
-                user,
-                credentials=credentials,
-            )
-
-            if result.get("status") == "success":
-
-                data = result.get("data", {})
-                files = data.get("files", [])
-
-                file_names = [
-                    file["name"]
-                    for file in files
-                ]
-
-                message = (
-                    f"There are {data.get('total_files', 0)} "
-                    "files in cloud storage. "
-                    "Recent examples: "
-                    + ", ".join(file_names)
-                    + "."
-                )
-
-                return {
-                    "agent": self.name,
-                    "status": "success",
-                    "data": data,
-                    "message": message,
-                }
-
-        # -----------------------------------------
-        # Unsupported Request
+        # Unsupported Cloud Storage Request
         # -----------------------------------------
         return {
             "agent": self.name,
-            "status": "error",
+            "status": "unsupported",
             "data": {},
             "message": (
-                "The requested cloud storage information "
-                "is not currently supported."
+                "The requested cloud storage information " "is not currently supported."
             ),
         }
-

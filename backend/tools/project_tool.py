@@ -1,3 +1,6 @@
+from datetime import date
+
+
 class ProjectTool:
     """
     Controlled tool for project management operations.
@@ -11,15 +14,12 @@ class ProjectTool:
         # -------------------------------------------------
         # Employee-specific project data
         # -------------------------------------------------
-        #
-        # employee_test is currently our test employee.
-        # These are the projects/tasks assigned to that user.
-        #
         employee_projects = [
             {
                 "name": "Vetri E-Commerce",
                 "status": "Delayed",
                 "progress": 75,
+                "risk": "High",
             }
         ]
 
@@ -28,6 +28,7 @@ class ProjectTool:
                 "project": "Vetri E-Commerce",
                 "task": "Payment Integration",
                 "status": "Pending",
+                "due_date": "2026-09-04",
             }
         ]
 
@@ -36,7 +37,6 @@ class ProjectTool:
         # -----------------------------------------
         if action == "get_projects":
 
-            # Employee receives only their own projects.
             if user and not user.is_staff and not user.is_superuser:
                 return {
                     "status": "success",
@@ -46,7 +46,6 @@ class ProjectTool:
                     },
                 }
 
-            # Manager/Admin can see broader project data.
             return {
                 "status": "success",
                 "data": {
@@ -55,21 +54,25 @@ class ProjectTool:
                             "name": "Vetri E-Commerce",
                             "status": "Delayed",
                             "progress": 75,
+                            "risk": "High",
                         },
                         {
                             "name": "AI Dashboard",
                             "status": "Delayed",
                             "progress": 80,
+                            "risk": "Medium",
                         },
                         {
                             "name": "CRM System",
                             "status": "Active",
                             "progress": 60,
+                            "risk": "Low",
                         },
                         {
                             "name": "HR Management System",
                             "status": "Completed",
                             "progress": 100,
+                            "risk": "Low",
                         },
                     ],
                     "total_projects": 4,
@@ -142,7 +145,6 @@ class ProjectTool:
         # -----------------------------------------
         if action == "get_project_tasks":
 
-            # Employee receives only their own tasks.
             if user and not user.is_staff and not user.is_superuser:
                 return {
                     "status": "success",
@@ -151,7 +153,6 @@ class ProjectTool:
                     },
                 }
 
-            # Manager/Admin can see broader task data.
             return {
                 "status": "success",
                 "data": {
@@ -160,18 +161,69 @@ class ProjectTool:
                             "project": "Vetri E-Commerce",
                             "task": "Payment Integration",
                             "status": "Pending",
+                            "due_date": "2026-09-04",
                         },
                         {
                             "project": "AI Dashboard",
                             "task": "Dashboard UI",
                             "status": "In Progress",
+                            "due_date": "2026-10-07",
                         },
                         {
                             "project": "CRM System",
                             "task": "Customer Module",
                             "status": "Completed",
+                            "due_date": "2026-09-15",
                         },
-                    ]
+                    ],
+                },
+            }
+
+        # -----------------------------------------
+        # Overdue Tasks
+        # -----------------------------------------
+        if action == "get_overdue_tasks":
+
+            today = date.today()
+
+            all_tasks = [
+                {
+                    "project": "Vetri E-Commerce",
+                    "task": "Payment Integration",
+                    "status": "Pending",
+                    "due_date": "2026-09-04",
+                },
+                {
+                    "project": "AI Dashboard",
+                    "task": "Dashboard UI",
+                    "status": "In Progress",
+                    "due_date": "2026-10-07",
+                },
+                {
+                    "project": "CRM System",
+                    "task": "Customer Module",
+                    "status": "Completed",
+                    "due_date": "2026-09-15",
+                },
+            ]
+
+            overdue_tasks = []
+
+            for task in all_tasks:
+
+                if task["status"].lower() == "completed":
+                    continue
+
+                due_date = date.fromisoformat(task["due_date"])
+
+                if due_date < today:
+                    overdue_tasks.append(task)
+
+            return {
+                "status": "success",
+                "data": {
+                    "overdue_tasks": overdue_tasks,
+                    "total_overdue": len(overdue_tasks),
                 },
             }
 

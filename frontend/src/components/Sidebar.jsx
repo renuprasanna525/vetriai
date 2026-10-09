@@ -73,7 +73,23 @@ function Sidebar() {
             loadUnreadCount();
         }, 30000);
 
-        return () => clearInterval(interval);
+        const handleNotificationsUpdated = () => {
+            loadUnreadCount();
+        };
+
+        window.addEventListener(
+            "notificationsUpdated",
+            handleNotificationsUpdated
+        );
+
+        return () => {
+            clearInterval(interval);
+
+            window.removeEventListener(
+                "notificationsUpdated",
+                handleNotificationsUpdated
+            );
+        };
     }, []);
 
     function navItem(path, icon, label, badgeCount = 0) {

@@ -79,6 +79,7 @@ class AgentRegistry:
             "employee",
             "employees",
             "leave",
+            "team",
         ]
 
         if any(keyword in request_lower for keyword in hr_keywords):
@@ -513,8 +514,14 @@ class AgentRegistry:
 
         has_github_context = any(term in request_lower for term in github_context)
 
-        if has_github_context and (
-            "issue" in request_lower or "issues" in request_lower
+        if (
+            has_github_context
+            and ("issue" in request_lower or "issues" in request_lower)
+            and not (
+                "cloud storage" in request_lower
+                or "cloud files" in request_lower
+                or "storage files" in request_lower
+            )
         ):
             for agent in self.agents:
                 if agent.name == "GitHub Agent":
@@ -545,29 +552,6 @@ class AgentRegistry:
                     return [agent]
 
         # =====================================================
-        # Customer Follow-up Priority
-        # =====================================================
-
-        has_customer_reference = (
-            "customer" in request_lower or "customers" in request_lower
-        )
-
-        has_followup_reference = (
-            "follow-up" in request_lower
-            or "follow up" in request_lower
-            or "followups" in request_lower
-        )
-
-        if has_customer_reference and has_followup_reference:
-            for agent in self.agents:
-                if agent.name == "CRM Agent":
-                    print(
-                        "CUSTOMER FOLLOW-UP PRIORITY:",
-                        agent.name,
-                    )
-                    return [agent]
-
-        # =====================================================
         # Sales
         # =====================================================
 
@@ -581,6 +565,8 @@ class AgentRegistry:
             "followups",
             "order",
             "orders",
+            "customer",
+            "customers",
             "sales policy",
             "sales sop",
             "sales process",
@@ -599,6 +585,15 @@ class AgentRegistry:
             "expenses",
             "profit",
             "financial summary",
+            # Payment-related finance requests
+            "payment",
+            "payments",
+            "payment due",
+            "payments due",
+            "due payment",
+            "due payments",
+            "due today",
+            "payments due today",
         ]
 
         finance_score = sum(

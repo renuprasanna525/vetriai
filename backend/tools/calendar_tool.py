@@ -23,6 +23,7 @@ class CalendarTool:
             "get_today_events",
             "get_tomorrow_events",
             "get_day_after_tomorrow_events",
+            "get_upcoming_events",
         ]
 
         if action not in supported_actions:
@@ -62,11 +63,17 @@ class CalendarTool:
                 day_offset = 0
             elif action == "get_tomorrow_events":
                 day_offset = 1
-            else:
+            elif action == "get_day_after_tomorrow_events":
                 day_offset = 2
+            else:
+                day_offset = None
 
-            start_time = start_of_today + timedelta(days=day_offset)
-            end_time = start_time + timedelta(days=1)
+            if action == "get_upcoming_events":
+                start_time = now
+                end_time = now + timedelta(days=7)
+            else:
+                start_time = start_of_today + timedelta(days=day_offset)
+                end_time = start_time + timedelta(days=1)
 
             events_result = (
                 service.events()

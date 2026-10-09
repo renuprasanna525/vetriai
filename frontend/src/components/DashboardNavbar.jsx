@@ -67,7 +67,23 @@ function DashboardNavbar() {
             loadUnreadCount();
         }, 30000);
 
-        return () => clearInterval(interval);
+        const handleNotificationsUpdated = () => {
+            loadUnreadCount();
+        };
+
+        window.addEventListener(
+            "notificationsUpdated",
+            handleNotificationsUpdated
+        );
+
+        return () => {
+            clearInterval(interval);
+
+            window.removeEventListener(
+                "notificationsUpdated",
+                handleNotificationsUpdated
+            );
+        };
     }, []);
 
     return (
