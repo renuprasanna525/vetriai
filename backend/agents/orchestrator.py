@@ -3598,9 +3598,38 @@ class AIOrchestrator:
         3. Multi-agent request
         4. Single-agent request
         """
-
         conversation_history = conversation_history or []
 
+        # Handle standalone greetings before contextual/business routing.
+        greeting = str(request).strip().lower().rstrip("!.,?")
+
+        greetings = {
+            "hi",
+            "hello",
+            "hey",
+            "hi there",
+            "hello there",
+            "hey there",
+            "good morning",
+            "good afternoon",
+            "good evening",
+        }
+
+        if greeting in greetings:
+            return {
+                "status": "success",
+                "intent": "greeting",
+                "agent": "Vetri AI",
+                "response": (
+                    "Hello! I'm Vetri AI BO Assistant. "
+                    "How can I help you today? You can ask me "
+                    "about Sales, Finance, Projects, HR, or other "
+                    "available business areas."
+                ),
+                "data": {
+                    "conversation_context_used": bool(conversation_history),
+                },
+            }
         # Handle short rejection replies without calling an agent.
         if (
             conversation_history
