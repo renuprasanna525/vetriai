@@ -15,9 +15,9 @@ The current platform already provides a functional foundation for:
 * Audit logging
 * Knowledge-base and RAG functionality
 * Groq-based LLM integration
-* Google Calendar integration
-* Email functionality
-* Automated reminders and intelligent alerts
+* Google Calendar OAuth/API implementation, with production verification still subject to final deployment checks
+* Email tool functionality, with external email-provider connectivity tracked separately
+* Automated reminders and intelligent alerts, with delivery reliability subject to provider configuration and testing
 * Reporting and business briefing capabilities
 * Management priority and attention workflows
 

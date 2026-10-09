@@ -30,7 +30,7 @@ The platform supports business capabilities including:
 * Developer operations
 * QA
 * Operations
-* GitHub-related business information
+* GitHub-related functionality using internal/mock behavior; live GitHub API retrieval is not currently connected
 * Notifications
 * Approvals
 * Automation
@@ -254,7 +254,7 @@ Current registered business agents include:
 * QA Agent
 * Operations Agent
 * Reporting Agent
-* GitHub Agent
+* GitHub Agent (currently does not retrieve live repository, issue, or pull-request data through a GitHub API)
 
 The AI Orchestrator determines which agent or agents should handle a request.
 
@@ -402,7 +402,9 @@ Execution Result
 Notification / Audit Record
 ```
 
-The exact approval behavior depends on the operation and configured permissions.
+The requester can edit or cancel their own pending approval request. Managers and administrators can approve pending actions, subject to the application's authorization checks.
+
+Users cannot edit or cancel another user's pending request unless explicitly authorized by the application's policy.
 
 ---
 
@@ -417,11 +419,12 @@ When an approval request is generated:
 5. Verify recipients or other sensitive information.
 6. Choose the appropriate action.
 
-Supported approval actions may include:
+Available actions depend on the user's role and ownership of the request:
 
-* Approve
-* Edit
-* Cancel
+* **Requester:** Edit or cancel their own pending approval request.
+* **Manager or administrator:** Approve a pending action when authorized.
+
+Only use actions available to your account. If you cannot perform an action, contact an administrator rather than attempting to bypass the permission checks.
 
 Do not approve a request if its parameters are incorrect or unexpected.
 
@@ -528,11 +531,11 @@ Give me the latest business report.
 
 # 20. WhatsApp
 
-The application includes WhatsApp-related functionality and reliability handling.
+The application includes WhatsApp notification functionality with validation and error handling.
 
-Real Meta WhatsApp Cloud API message delivery depends on valid Meta configuration and credentials.
+**Simulated delivery:** The current implementation supports a mock WhatsApp provider for testing the notification workflow. A simulated result does not mean that a message was delivered to WhatsApp.
 
-Production delivery requires the appropriate Meta configuration, including values such as:
+**Real Meta WhatsApp Cloud API delivery:** Actual external message delivery requires valid Meta configuration and credentials. The required production environment variables include:
 
 ```text
 WHATSAPP_API_URL
@@ -540,7 +543,7 @@ WHATSAPP_ACCESS_TOKEN
 WHATSAPP_PHONE_NUMBER_ID
 ```
 
-If these values are not configured, real external WhatsApp delivery cannot be completed.
+Real delivery remains pending provider configuration and successful end-to-end testing. If these values are missing or invalid, real external WhatsApp delivery cannot be completed.
 
 ---
 
