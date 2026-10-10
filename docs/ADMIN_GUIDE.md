@@ -170,109 +170,131 @@ Possible problem areas include:
 
 # 8. Approval Workflow Administration
 
-Sensitive actions require approval before execution.
+Sensitive actions defined in `ApprovalWorkflow.SENSITIVE_ACTIONS` require approval before execution. These include:
 
-Current sensitive actions include:
-
-* `send_email`
-* `send_bulk_message`
-* `approve_leave`
-* `financial_change`
-* `deploy`
-* `delete_data`
+- `send_email`
+- `send_bulk_message`
+- `approve_leave`
+- `financial_change`
+- `deploy`
+- `delete_data`
 
 The workflow is:
 
-```text
 Sensitive Request
-      ↓
-Approval Created
-      ↓
-Pending Notification
-      ↓
-User Review
-      ↓
+    |
+    v
+Approval Preview Created
+    |
+    v
+Pending Notification and Audit Record
+    |
+    v
+Authorized Review
+    |
+    v
 Approve / Edit / Cancel
-      ↓
-Tool Execution
-      ↓
-Execution Notification
-      ↓
-Audit Log
-```
+    |
+    v
+Execution Attempt (after approval)
+    |
+    v
+Execution Result Recorded
+    |
+    v
+Audit Record
 
-Administrators should monitor pending approval requests and investigate unexpected or failed executions.
+**Authorization rules:**
+
+- Authenticated users can request approval previews through the API.
+- Managers and administrators have the `approve_actions` permission.
+- Only the original requester can edit or cancel their own pending approval.
+- Actions that are no longer pending cannot be edited, cancelled, or approved through the workflow.
+- Approval does not guarantee successful execution. The execution result must be checked separately.
+
+Administrators should review pending approvals and investigate failed executions. Do not assume an action was successfully executed merely because its approval status is `approved`.
 
 ---
 
 # 9. Approval API
 
-The approval system provides the following operations.
+The approval system provides these authenticated endpoints:
 
-### List Approvals
+**List approvals**
 
 ```http
 GET /api/approvals/
 ```
 
-### Filter Approvals
+**Filter approvals**
 
 ```http
 GET /api/approvals/?status=pending
 ```
 
-### Create Approval Preview
+**Create an approval preview**
 
 ```http
 POST /api/approvals/preview/
 ```
 
-### View Approval
+**View an approval**
 
 ```http
 GET /api/approvals/<action_id>/
 ```
 
-### Approve Action
+**Approve an action**
 
 ```http
 POST /api/approvals/<action_id>/approve/
 ```
 
-### Edit Approval
+**Edit a pending approval**
 
 ```http
 PUT /api/approvals/<action_id>/edit/
 ```
 
-### Cancel Approval
+**Cancel a pending approval**
 
 ```http
 POST /api/approvals/<action_id>/cancel/
 ```
 
-All approval endpoints require authentication.
+All approval endpoints require authentication. Viewing approvals and approving actions are additionally controlled by the Permission Engine:
+
+- `view_approvals`: granted to manager and admin roles.
+- `approve_actions`: granted to manager and admin roles.
+- Editing and cancellation: restricted by the API to the original requester of the pending action.
+
+Requests that fail authorization should be rejected. Administrators should not bypass the requester-ownership rules when managing another user's pending action.
 
 ---
 
 # 10. Approval Failure Handling
 
-A sensitive action may be approved successfully but still fail during tool execution.
+Approval status and execution status represent different stages of the workflow.
 
-For example, an email action may fail when required recipient information is missing.
+- `pending`: the action is awaiting a decision.
+- `approved`: the action was approved. Execution may still succeed or fail.
+- `cancelled`: the pending action was cancelled.
+- `execution_status = success`: the executor returned a successful result.
+- `execution_status = failed`: execution failed or no executor was configured.
 
-Example:
+When an approved action fails during execution, the workflow records the failure result and creates an audit record identifying the execution failure. The approval status remains `approved`, while the separate execution status records `failed`.
 
-```json
-{
-    "status": "error",
-    "message": "Recipient is required."
-}
-```
+Administrators investigating a failure should review:
 
-Administrators should review the approval result and audit record when an execution fails.
+- Approval status and execution status
+- Saved action parameters
+- Executor configuration
+- Stored execution result
+- Related audit records
 
-The approval system records execution results so that failures can be investigated.
+An approved action must not be reported as successfully executed unless its execution result confirms success. Notifications indicating successful execution should likewise be interpreted according to the recorded result.
+
+The approval test suite verifies the core API authorization and workflow persistence behavior. Real external action delivery must be tested separately before it is reported as production-verified.
 
 ---
 
@@ -280,19 +302,17 @@ The approval system records execution results so that failures can be investigat
 
 Notifications provide information about important application events.
 
-Notifications can include:
-
 Notifications may be delivered through supported notification channels, including in-app notifications, email, and WhatsApp when configured.
 
-* Approval requests
-* Approved actions
-* Executed actions
-* Project risks
-* High-priority leads
-* Overdue payments
-* Customer issues
-* Deadlines
-* Intelligent alerts
+Notifications can include:
+
+- Approval requests
+- Approved actions
+- Executed actions
+- Project risks
+- High-priority leads
+- Overdue payments
+- Customer issues
 
 Notification APIs are restricted to the authenticated user's notifications.
 
@@ -363,17 +383,22 @@ Audit records can be used to investigate:
 * Whether execution succeeded or failed
 * When the action occurred
 
-A typical approval workflow may produce records such as:
+A typical approval workflow may produce audit records such as:
 
 ```text
 Required - Pending
-        ↓
+        |
+        v
 Approved
-        ↓
-Approved - Executed
 ```
 
-Administrators should review unusual or unexpected records.
+If execution fails after approval, the workflow records an execution-failure audit entry, such as:
+
+```text
+Approved - Execution Failed
+```
+
+The exact audit records depend on the outcome of the action. Administrators should review the execution result and related audit records rather than assuming that approval means successful execution.
 
 ---
 
@@ -393,15 +418,20 @@ The OAuth flow is:
 
 ```text
 Application
-     ↓
+     |
+     v
 Google OAuth Login
-     ↓
+     |
+     v
 User Authorization
-     ↓
+     |
+     v
 OAuth Callback
-     ↓
+     |
+     v
 Credentials Stored in Session
-     ↓
+     |
+     v
 Calendar API
 ```
 
@@ -504,6 +534,14 @@ python manage.py makemigrations
 python manage.py migrate
 ```
 
+**Migration guidance:**
+
+- Run `makemigrations` when model changes require new database migrations.
+- Review generated migration files before applying them.
+- Run `migrate` to apply pending migrations to the configured database.
+- Back up important production data before applying migrations.
+- Avoid generating migrations unnecessarily when no model changes require them.
+
 The application should be restarted after relevant backend configuration changes.
 
 ---
@@ -527,17 +565,17 @@ Administrators should manage:
 
 ### WhatsApp Configuration and Delivery Status
 
-The WhatsApp notification service is implemented using the Meta WhatsApp Cloud API.
+The WhatsApp notification service supports a simulated delivery mode. Real delivery through the Meta WhatsApp Cloud API requires valid provider configuration and a successful provider delivery test.
 
 The following production environment variables are required for real WhatsApp delivery:
 
-* WHATSAPP_API_URL
-* WHATSAPP_ACCESS_TOKEN
-* WHATSAPP_PHONE_NUMBER_ID
+- `WHATSAPP_API_URL`
+- `WHATSAPP_ACCESS_TOKEN`
+- `WHATSAPP_PHONE_NUMBER_ID`
 
-The WhatsApp service includes configuration validation and delivery error handling.
+The service includes configuration validation and delivery error handling. A simulated result confirms only that the mock flow ran; it does not confirm delivery through Meta.
 
-Real Meta WhatsApp message delivery remains pending until valid Meta WhatsApp Cloud API credentials are configured.
+Real Meta WhatsApp message delivery remains unverified until valid credentials are configured and a successful provider delivery test is completed.
 
 Sensitive credentials must never be committed to GitHub.
 
@@ -571,17 +609,23 @@ A typical deployment workflow is:
 
 ```text
 Code Changes
-     ↓
+     |
+     v
 Git Commit
-     ↓
+     |
+     v
 Git Push
-     ↓
+     |
+     v
 GitHub
-     ↓
+     |
+     v
 Render Build
-     ↓
+     |
+     v
 Render Deployment
-     ↓
+     |
+     v
 Production Verification
 ```
 
@@ -591,44 +635,47 @@ After deployment, administrators should verify that the application is working c
 
 # 23. Deployment Verification
 
-After a new deployment, verify:
+After each deployment, run the following checks and record the actual result. Do not mark a check as passed until it has been tested in the target environment.
 
 ### Backend
 
-* Django service is running.
-* Gunicorn starts successfully.
-* Database migrations are successful.
-* API endpoints are reachable.
-* No configuration errors are present.
+- Confirm the Django service is running.
+- Check that Gunicorn starts successfully.
+- Confirm required database migrations are applied.
+- Verify that the required API endpoints are reachable.
+- Review deployment logs for configuration errors.
 
 ### Frontend
 
-* React application loads.
-* Login works.
-* API requests reach the backend.
-* Dashboard loads and retrieves data from the /api/dashboard/ endpoint.
-* AI Chat works.
+- Confirm the React application loads.
+- Test login and authentication.
+- Verify API requests use the configured deployed backend URL rather than a local development URL.
+- Confirm the dashboard retrieves data from the `/api/dashboard/` endpoint.
+- Test AI Chat and relevant follow-up interactions.
 
 ### Integrations
 
-* Google Calendar works.
-* Email functionality works.
-* Business tools respond correctly.
+- Test Google Calendar OAuth and API access using the configured production callback and authorized session.
+- Test email delivery only when email configuration is available and an approved test recipient is being used.
+- Verify business tools against their actual implementation; do not assume external services are connected when the feature uses mock or internal data.
 
-### Security
+### Security and Approval Workflow
 
-* JWT authentication works.
-* Protected APIs require authentication.
-* Approval workflow works.
-* Audit records are generated.
+- Confirm JWT authentication works and protected APIs reject unauthenticated requests.
+- Verify approval permissions and requester-ownership restrictions.
+- Confirm approval and execution outcomes are recorded correctly in audit logs.
+- Keep approval-only tests separate from tests that execute real external actions.
 
+### Recording Results
+
+Record each check as **Passed**, **Failed**, **Blocked**, or **Not Tested**. Document any remaining issue and its next action. Do not describe the deployment as fully verified while critical checks remain unresolved.
 ---
 
 # 24. Troubleshooting Procedure
 
 When a production problem occurs, follow this sequence:
 
-### Step 1 — Identify the Problem
+### Step 1 - Identify the Problem
 
 Determine whether the issue affects:
 
@@ -641,7 +688,7 @@ Determine whether the issue affects:
 * External integration
 * Automation
 
-### Step 2 — Check Logs
+### Step 2 - Check Logs
 
 Review the backend and deployment logs.
 
@@ -654,7 +701,7 @@ Look for:
 * Integration errors
 * Tool execution errors
 
-### Step 3 — Test the API
+### Step 3 - Test the API
 
 Test the relevant endpoint independently.
 
@@ -664,15 +711,15 @@ For example:
 GET /api/hello/
 ```
 
-### Step 4 — Check Authentication
+### Step 4 - Check Authentication
 
 Verify that the JWT access token is valid.
 
-### Step 5 — Check Configuration
+### Step 5 - Check Configuration
 
 Verify relevant environment variables and external service configuration.
 
-### Step 6 — Retest
+### Step 6 - Retest
 
 After making the correction, repeat the affected workflow.
 
