@@ -42,15 +42,22 @@ def is_action_requester(action, user):
     )
 
 
+
 class ApprovalListView(APIView):
-    """List approval actions for managers and administrators."""
+    """List approval actions according to the user's role and ownership."""
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        require_approval_permission(request.user, "view_approvals")
-
         from approvals.models import ApprovalAction
+
+        role = get_user_role(request.user)
+        permission_engine = PermissionEngine()
+
+        can_view_all = permission_engine.has_permission(
+            role,
+            "view_approvals",
+        )
 
         queryset = ApprovalAction.objects.all()
 
@@ -59,7 +66,19 @@ class ApprovalListView(APIView):
             queryset = queryset.filter(status=status_filter)
 
         workflow = tool_registry.approval_workflow
-        actions = [workflow._serialize_action(record) for record in queryset]
+        actions = [
+            workflow._serialize_action(record)
+            for record in queryset
+        ]
+
+        if not can_view_all:
+            # Non-approvers can see only their own pending requests.
+            actions = [
+                action
+                for action in actions
+                if is_action_requester(action, request.user)
+                and action.get("status") == "pending"
+            ]
 
         return Response(
             {
