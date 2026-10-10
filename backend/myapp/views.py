@@ -400,6 +400,7 @@ def current_user_api(request):
 
     return Response(
         {
+            "id": user.id,
             "username": user.username,
             "name": name,
             "email": user.email,

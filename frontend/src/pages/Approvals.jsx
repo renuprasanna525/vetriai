@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-
+import { getCurrentUser } from "../services/authService";
 import {
     getApprovals,
     approveAction,
@@ -17,6 +17,7 @@ function Approvals() {
 
     const [error, setError] = useState("");
     const [message, setMessage] = useState("");
+    const [currentUser, setCurrentUser] = useState(null);
 
     async function loadApprovals() {
         try {
@@ -35,7 +36,18 @@ function Approvals() {
     }
 
     useEffect(() => {
-        loadApprovals();
+        async function initializePage() {
+            try {
+                const user = await getCurrentUser();
+                setCurrentUser(user);
+            } catch (err) {
+                setError(err.message);
+            }
+
+            await loadApprovals();
+        }
+
+        initializePage();
     }, []);
 
     async function handleApprove(actionId) {
@@ -266,6 +278,22 @@ function Approvals() {
 
                             const parameters =
                                 approval.parameters || {};
+                            const isApprover =
+                                ["admin", "manager"].includes(currentUser?.role_code);
+
+                            const isRequester =
+                                currentUser?.id != null &&
+                                approval.requester_id != null &&
+                                Number(currentUser.id) === Number(approval.requester_id);
+
+                            const isPending =
+                                approval.status === "pending";
+
+                            const canApprove =
+                                isApprover && isPending;
+
+                            const canEditOrCancel =
+                                isRequester && isPending;
 
                             const isProcessing =
                                 actionLoading === approval.action_id;
@@ -444,58 +472,67 @@ function Approvals() {
                                         {/* ACTION BUTTONS */}
                                         <div className="approval-actions">
 
-                                            <button
-                                                type="button"
-                                                className="btn btn-success"
-                                                onClick={() =>
-                                                    handleApprove(
-                                                        approval.action_id
-                                                    )
-                                                }
-                                                disabled={isProcessing}
-                                            >
-                                                {isProcessing ? (
-                                                    <>
-                                                        <span
-                                                            className="spinner-border spinner-border-sm me-2"
-                                                            role="status"
-                                                        ></span>
+                                            {/* APPROVE: Only managers and admins */}
+                                            {canApprove && (
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-success"
+                                                    onClick={() =>
+                                                        handleApprove(
+                                                            approval.action_id
+                                                        )
+                                                    }
+                                                    disabled={isProcessing}
+                                                >
+                                                    {isProcessing ? (
+                                                        <>
+                                                            <span
+                                                                className="spinner-border spinner-border-sm me-2"
+                                                                role="status"
+                                                            ></span>
 
-                                                        Processing...
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <i className="bi bi-check-lg me-1"></i>
-                                                        Approve
-                                                    </>
-                                                )}
-                                            </button>
+                                                            Processing...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <i className="bi bi-check-lg me-1"></i>
+                                                            Approve
+                                                        </>
+                                                    )}
+                                                </button>
+                                            )}
 
-                                            <button
-                                                type="button"
-                                                className="btn btn-warning"
-                                                onClick={() =>
-                                                    handleEdit(approval)
-                                                }
-                                                disabled={isProcessing}
-                                            >
-                                                <i className="bi bi-pencil me-1"></i>
-                                                Edit
-                                            </button>
+                                            {/* EDIT: Only the original requester */}
+                                            {canEditOrCancel && (
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-warning"
+                                                    onClick={() =>
+                                                        handleEdit(approval)
+                                                    }
+                                                    disabled={isProcessing}
+                                                >
+                                                    <i className="bi bi-pencil me-1"></i>
+                                                    Edit
+                                                </button>
+                                            )}
 
-                                            <button
-                                                type="button"
-                                                className="btn btn-danger"
-                                                onClick={() =>
-                                                    handleCancel(
-                                                        approval.action_id
-                                                    )
-                                                }
-                                                disabled={isProcessing}
-                                            >
-                                                <i className="bi bi-x-lg me-1"></i>
-                                                Cancel
-                                            </button>
+                                            {/* CANCEL: Only the original requester */}
+                                            {canEditOrCancel && (
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-danger"
+                                                    onClick={() =>
+                                                        handleCancel(
+                                                            approval.action_id
+                                                        )
+                                                    }
+                                                    disabled={isProcessing}
+                                                >
+                                                    <i className="bi bi-x-lg me-1"></i>
+                                                    Cancel
+                                                </button>
+                                            )}
 
                                         </div>
 
