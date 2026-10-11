@@ -1,3 +1,5 @@
+import re
+from tools.registry import ToolRegistry
 from .registry import AgentRegistry
 from permissions.permission_engine import PermissionEngine
 from audit_logs.utils import create_audit_log
@@ -3909,6 +3911,144 @@ class AIOrchestrator:
                     "role": role,
                     "authorized": True,
                 },
+            }
+
+        # =====================================================
+        # EXPLICIT EMAIL REQUEST -> APPROVAL WORKFLOW
+        # =====================================================
+
+        email_request = str(request).strip()
+
+        if re.match(
+            r"^(?:please\s+)?send\s+(?:an?\s+)?email\b",
+            email_request,
+            re.IGNORECASE,
+        ):
+            recipient_match = re.search(
+                r"\bto\s+([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})",
+                email_request,
+                re.IGNORECASE,
+            )
+            subject_match = re.search(
+                r'\bsubject\s*[:=]?\s*"(.*?)"',
+                email_request,
+                re.IGNORECASE | re.DOTALL,
+            )
+            message_match = re.search(
+                r'\bmessage\s*[:=]?\s*"(.*?)"',
+                email_request,
+                re.IGNORECASE | re.DOTALL,
+            )
+
+            recipient = recipient_match.group(1).strip() if recipient_match else ""
+            subject = subject_match.group(1).strip() if subject_match else ""
+            message = message_match.group(1).strip() if message_match else ""
+
+            missing_fields = [
+                field
+                for field, value in (
+                    ("recipient email address", recipient),
+                    ("quoted email subject", subject),
+                    ("quoted email message", message),
+                )
+                if not value
+            ]
+
+            if missing_fields:
+                return {
+                    "status": "needs_clarification",
+                    "intent": "Email Approval",
+                    "agent": "Sales Agent",
+                    "response": (
+                        "Before I create the email approval request, "
+                        "please provide the "
+                        + ", ".join(missing_fields)
+                        + ". No email has been sent."
+                    ),
+                    "data": {},
+                }
+
+            sales_agent = next(
+                (
+                    agent
+                    for agent in self.registry.get_agents()
+                    if agent.name == "Sales Agent"
+                ),
+                None,
+            )
+
+            if sales_agent is None:
+                return {
+                    "status": "error",
+                    "intent": "Email Approval",
+                    "agent": "Sales Agent",
+                    "response": (
+                        "Sales Agent is unavailable. " "No email has been sent."
+                    ),
+                    "data": {},
+                }
+
+            allowed = self.check_agent_permission(
+                user=user,
+                agent_name="Sales Agent",
+                agent=sales_agent,
+                agent_request=email_request,
+            )
+
+            if not allowed:
+                return {
+                    "status": "error",
+                    "intent": "Email Approval",
+                    "agent": "Sales Agent",
+                    "response": (
+                        "You do not have permission to request "
+                        "this email action. No email has been sent."
+                    ),
+                    "data": {},
+                }
+
+            tool_registry = ToolRegistry()
+
+            preview = tool_registry.request_action(
+                agent_name="Sales Agent",
+                tool_name="email_tool",
+                action="send_email",
+                parameters={
+                    "recipient": recipient,
+                    "subject": subject,
+                    "message": message,
+                },
+                user=user,
+            )
+
+            if preview.get("status") != "pending":
+                return {
+                    "status": "error",
+                    "intent": "Email Approval",
+                    "agent": "Sales Agent",
+                    "response": (
+                        preview.get(
+                            "message",
+                            "Could not create the email approval request.",
+                        )
+                        + " No email has been sent."
+                    ),
+                    "data": preview,
+                }
+
+            action_id = preview.get("action_id")
+
+            return {
+                "status": "success",
+                "intent": "Email Approval",
+                "agent": "Sales Agent",
+                "response": (
+                    f"Email approval request #{action_id} was created "
+                    "successfully. The email has NOT been sent. "
+                    "An authorized manager or admin must approve "
+                    "the request before it can be sent."
+                ),
+                "data": preview,
             }
 
         # =====================================================
