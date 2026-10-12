@@ -1,8 +1,8 @@
 import emailjs from "@emailjs/browser";
 
-const SERVICE_ID = "service_6lw1qoo";
-const TEMPLATE_ID = "template_xdyxtlm";
-const PUBLIC_KEY = "q9dvDM5rSw8yNKYSL";
+const SERVICE_ID = "service_hezo1dp";
+const TEMPLATE_ID = "template_kdno1ri";
+const PUBLIC_KEY = "deNfUoB8EuHjz_OiN";
 
 export const sendNotificationEmail = async ({
     to_name,
