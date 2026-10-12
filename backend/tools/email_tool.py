@@ -1,12 +1,15 @@
-from django.core.mail import send_mail
+import os
+
+import resend
 
 
 class EmailTool:
     """
     Controlled tool for email-related operations.
 
-    Sends email only when the action reaches the tool execution stage.
-    Approval is handled separately by ApprovalWorkflow.
+    Sends email through Resend's HTTPS API only when the action
+    reaches the tool execution stage. Approval is handled separately
+    by ApprovalWorkflow.
     """
 
     name = "email_tool"
@@ -44,30 +47,55 @@ class EmailTool:
                 "message": "Message is required.",
             }
 
+        api_key = os.getenv("RESEND_API_KEY")
+        from_email = os.getenv("RESEND_FROM_EMAIL")
+
+        if not api_key or not from_email:
+            return {
+                "status": "error",
+                "message": (
+                    "Email service is not configured. "
+                    "Set RESEND_API_KEY and RESEND_FROM_EMAIL."
+                ),
+            }
+
         try:
-            sent_count = send_mail(
-                subject=subject,
-                message=message,
-                from_email=None,
-                recipient_list=[recipient],
-                fail_silently=False,
+            resend.api_key = api_key
+
+            response = resend.Emails.send(
+                {
+                    "from": from_email,
+                    "to": [recipient],
+                    "subject": subject,
+                    "text": message,
+                }
             )
 
-            if sent_count == 1:
+            email_id = (
+                response.get("id")
+                if isinstance(response, dict)
+                else getattr(response, "id", None)
+            )
+
+            if email_id:
                 return {
                     "status": "success",
-                    "message": f"Email sent successfully to {recipient}.",
+                    "message": f"Email accepted by Resend for {recipient}.",
                     "recipient": recipient,
                     "subject": subject,
+                    "email_id": email_id,
                 }
 
             return {
                 "status": "error",
-                "message": "Email was not sent.",
+                "message": "Resend did not return an email ID.",
             }
 
-        except Exception as e:
+        except Exception:
             return {
                 "status": "error",
-                "message": f"Email sending failed: {str(e)}",
+                "message": (
+                    "Email sending failed through Resend. "
+                    "Check the service configuration and provider logs."
+                ),
             }
