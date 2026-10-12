@@ -123,3 +123,162 @@ class ApprovalWorkflowPersistenceTests(TestCase):
         )
 
         self.executor.assert_called_once()
+        mock_executed_notification.assert_called_once()
+
+        notification_kwargs = mock_executed_notification.call_args.kwargs
+        self.assertEqual(notification_kwargs["user"], self.user)
+        self.assertEqual(
+            notification_kwargs["related_id"],
+            str(preview["action_id"]),
+        )
+
+    @patch("approvals.approval_workflow.create_approval_pending_notification")
+    @patch("approvals.approval_workflow.create_audit_log")
+    def test_pending_approval_emails_eligible_approvers(
+        self, mock_audit, mock_notification
+    ):
+        from myapp.models import UserProfile
+
+        manager = User.objects.create_user(
+            username="approval_email_manager_test",
+            email="manager-test@example.com",
+            password="test-password-only",
+        )
+        UserProfile.objects.create(user=manager, role="manager")
+
+        admin = User.objects.create_user(
+            username="approval_email_admin_test",
+            email="admin-test@example.com",
+            password="test-password-only",
+            is_superuser=True,
+            is_staff=True,
+        )
+
+        preview = self.workflow.create_action_preview(
+            "Sales Agent",
+            "email_tool",
+            "send_email",
+            {"subject": "Pending email test"},
+            self.user,
+        )
+
+        self.assertEqual(preview["status"], "pending")
+
+        # Requester keeps the in-app notification.
+        requester_call = next(
+            call
+            for call in mock_notification.call_args_list
+            if call.kwargs.get("user") == self.user
+        )
+        self.assertNotIn("channel", requester_call.kwargs)
+
+        # Approvers receive email-channel notifications.
+        approver_calls = {
+            call.kwargs["user"].email: call.kwargs
+            for call in mock_notification.call_args_list
+            if call.kwargs.get("channel") == "email"
+        }
+
+        self.assertIn(manager.email, approver_calls)
+        self.assertIn(admin.email, approver_calls)
+
+        for email, kwargs in approver_calls.items():
+            self.assertEqual(kwargs["related_id"], str(preview["action_id"]))
+            self.assertIn("approval", kwargs["message"].lower())
+
+    @patch("approvals.approval_workflow.create_approval_pending_notification")
+    @patch("approvals.approval_workflow.create_audit_log")
+    def test_successful_execution_emails_approvers(self, mock_audit, mock_notification):
+        from myapp.models import UserProfile
+
+        manager = User.objects.create_user(
+            username="approval_success_manager_test",
+            email="success-manager@example.com",
+            password="test-password-only",
+        )
+        UserProfile.objects.create(user=manager, role="manager")
+
+        preview = self.workflow.create_action_preview(
+            "Sales Agent",
+            "email_tool",
+            "send_email",
+            {"subject": "Successful execution test"},
+            self.user,
+        )
+        mock_notification.reset_mock()
+
+        result = self.workflow.approve_action(
+            preview["action_id"],
+            user=self.user,
+        )
+
+        self.assertEqual(result["execution"]["status"], "success")
+
+        manager_email_calls = [
+            call.kwargs
+            for call in mock_notification.call_args_list
+            if call.kwargs.get("user") == manager
+            and call.kwargs.get("channel") == "email"
+        ]
+
+        self.assertEqual(len(manager_email_calls), 1)
+        self.assertIn("success", manager_email_calls[0]["message"].lower())
+        self.assertEqual(
+            manager_email_calls[0]["title"],
+            "Approved Action Execution Successful",
+        )
+
+    @patch("approvals.approval_workflow.create_approval_pending_notification")
+    @patch("approvals.approval_workflow.create_audit_log")
+    def test_failed_execution_emails_approvers(self, mock_audit, mock_notification):
+        from myapp.models import UserProfile
+
+        manager = User.objects.create_user(
+            username="approval_failure_manager_test",
+            email="failure-manager@example.com",
+            password="test-password-only",
+        )
+        UserProfile.objects.create(user=manager, role="manager")
+
+        failing_workflow = ApprovalWorkflow(
+            executor=Mock(
+                return_value={
+                    "status": "error",
+                    "message": "Mock failure only",
+                }
+            )
+        )
+
+        preview = failing_workflow.create_action_preview(
+            "Sales Agent",
+            "email_tool",
+            "send_email",
+            {"subject": "Failed execution test"},
+            self.user,
+        )
+        mock_notification.reset_mock()
+
+        result = failing_workflow.approve_action(
+            preview["action_id"],
+            user=self.user,
+        )
+
+        self.assertEqual(result["execution"]["status"], "error")
+        self.assertEqual(
+            result["action"]["execution_status"],
+            "failed",
+        )
+
+        manager_email_calls = [
+            call.kwargs
+            for call in mock_notification.call_args_list
+            if call.kwargs.get("user") == manager
+            and call.kwargs.get("channel") == "email"
+        ]
+
+        self.assertEqual(len(manager_email_calls), 1)
+        self.assertIn("failed", manager_email_calls[0]["message"].lower())
+        self.assertEqual(
+            manager_email_calls[0]["title"],
+            "Approved Action Execution Failed",
+        )

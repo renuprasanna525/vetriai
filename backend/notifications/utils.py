@@ -1,6 +1,10 @@
+import logging
+
 from .models import Notification
 from tools.email_tool import EmailTool
 from tools.whatsapp_service import WhatsAppService
+
+logger = logging.getLogger(__name__)
 
 
 def _deliver_email_notification(notification):
@@ -91,7 +95,33 @@ def create_notification(
     )
 
     if channel == "email":
-        _deliver_email_notification(notification)
+        try:
+            delivery_result = _deliver_email_notification(notification)
+
+            if not isinstance(delivery_result, dict):
+                logger.error(
+                    "Email notification delivery returned an unexpected result "
+                    "for notification %s.",
+                    notification.pk,
+                )
+            elif delivery_result.get("status") != "success":
+                logger.error(
+                    "Email notification delivery failed for notification %s: %s",
+                    notification.pk,
+                    delivery_result.get("message", delivery_result),
+                )
+            else:
+                logger.info(
+                    "Email notification delivered successfully for notification %s.",
+                    notification.pk,
+                )
+
+        except Exception:
+            logger.exception(
+                "Email notification delivery raised an exception "
+                "for notification %s.",
+                notification.pk,
+            )
 
     if channel == "whatsapp":
         _deliver_whatsapp_notification(notification)
@@ -184,6 +214,7 @@ def create_approval_pending_notification(
     message,
     related_id=None,
     channel="in_app",
+    title="Approval Required",
 ):
     """
     Create a notification for a pending approval.
@@ -200,7 +231,7 @@ def create_approval_pending_notification(
     return create_notification(
         user=user,
         notification_type="approval_pending",
-        title="Approval Required",
+        title=title,
         message=message,
         priority="high",
         channel=channel,

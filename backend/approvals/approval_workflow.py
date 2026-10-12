@@ -1,3 +1,5 @@
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 
 from approvals.models import ApprovalAction
@@ -11,7 +13,10 @@ from notifications.utils import (
 class ApprovalWorkflow:
     """
     Handles human approval for sensitive actions.
-    Approval records are persisted in the Django database.
+
+    Persists approval records, notifies requesters in-app, and emails
+    eligible active manager/admin approvers when approvals are created
+    or execution completes.
     """
 
     SENSITIVE_ACTIONS = {
@@ -22,6 +27,8 @@ class ApprovalWorkflow:
         "deploy",
         "delete_data",
     }
+
+    APPROVER_ROLES = {"manager", "admin"}
 
     def __init__(self, executor=None):
         self.executor = executor
@@ -43,6 +50,72 @@ class ApprovalWorkflow:
             "execution_status": record.execution_status,
             "execution_result": record.execution_result,
         }
+
+    @classmethod
+    def _get_approver_users(cls):
+        """
+        Return active manager/admin users, including superusers,
+        who have an email address.
+
+        Users without a profile or email address are skipped.
+        """
+        User = get_user_model()
+        approvers = []
+
+        users = (
+            User.objects.filter(
+                is_active=True,
+            )
+            .exclude(
+                email__isnull=True,
+            )
+            .exclude(
+                email="",
+            )
+        )
+
+        for candidate in users:
+            if candidate.is_superuser:
+                approvers.append(candidate)
+                continue
+
+            try:
+                profile = candidate.profile
+                role = getattr(profile, "role", None)
+            except (ObjectDoesNotExist, AttributeError):
+                continue
+
+            if role in cls.APPROVER_ROLES:
+                approvers.append(candidate)
+
+        return approvers
+
+    @classmethod
+    def _notify_approvers_by_email(
+        cls,
+        message,
+        related_id,
+        title="Approval Required",
+    ):
+        """
+        Email eligible approvers using the existing notification helper.
+
+        Notification failures must not interrupt approval creation
+        or the result of an already-executed action.
+        """
+        for approver in cls._get_approver_users():
+            try:
+                create_approval_pending_notification(
+                    user=approver,
+                    message=message,
+                    related_id=str(related_id),
+                    channel="email",
+                    title=title,
+                )
+            except Exception:
+                # Do not fail the approval workflow because a notification
+                # could not be delivered.
+                continue
 
     def create_action_preview(
         self, agent_name, tool_name, action, parameters=None, user=None
@@ -88,6 +161,13 @@ class ApprovalWorkflow:
             result=f"Approval requested for action {record.pk}.",
         )
 
+        message = (
+            f"{agent_name} requested approval for "
+            f"{action} using {tool_name}. "
+            f"Approval ID: {record.pk}."
+        )
+
+        # Preserve the requester's existing in-app notification.
         if user:
             create_approval_pending_notification(
                 user=user,
@@ -97,6 +177,12 @@ class ApprovalWorkflow:
                 ),
                 related_id=str(record.pk),
             )
+
+        # Notify active manager/admin approvers by email.
+        self._notify_approvers_by_email(
+            message=message,
+            related_id=record.pk,
+        )
 
         return preview
 
@@ -200,19 +286,40 @@ class ApprovalWorkflow:
                 action=action_data["action"],
                 approval="Approved - Execution Failed",
                 result=execution_result.get(
-                    "message", "Approved action execution failed."
+                    "message",
+                    "Approved action execution failed.",
                 ),
             )
 
-        if execution_status == "success" and user:
+        # Preserve the existing requester's in-app success notification.
+        if execution_status == "success" and record.requester_id:
             create_approval_executed_notification(
-                user=user,
+                user=record.requester,
                 message=(
                     f"{action_data['agent']} approved and executed "
                     f"{action_data['action']} successfully."
                 ),
                 related_id=str(action_id),
             )
+
+        # Email approvers for both successful and failed execution.
+        completion_message = (
+            f"Approval action {action_id} has completed execution.\n"
+            f"Action: {action_data['action']}\n"
+            f"Agent: {action_data['agent']}\n"
+            f"Execution status: {execution_status}\n"
+            f"Result: {execution_result.get('message', execution_status)}"
+        )
+
+        self._notify_approvers_by_email(
+            message=completion_message,
+            related_id=action_id,
+            title=(
+                "Approved Action Execution Successful"
+                if execution_status == "success"
+                else "Approved Action Execution Failed"
+            ),
+        )
 
         return {
             "status": "approved",

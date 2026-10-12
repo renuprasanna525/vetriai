@@ -22,7 +22,10 @@ class EmailTool:
         recipient=None,
         subject=None,
         message=None,
+        to=None,
     ):
+        recipient = recipient or to
+
         if action != "send_email":
             return {
                 "status": "error",
