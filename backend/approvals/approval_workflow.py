@@ -54,27 +54,14 @@ class ApprovalWorkflow:
     @classmethod
     def _get_approver_users(cls):
         """
-        Return active manager/admin users, including superusers,
-        who have an email address.
-
-        Users without a profile or email address are skipped.
+        Return active manager/admin users, including superusers.
+        Email addresses are not required for in-app or simulated
+        WhatsApp notifications.
         """
         User = get_user_model()
         approvers = []
 
-        users = (
-            User.objects.filter(
-                is_active=True,
-            )
-            .exclude(
-                email__isnull=True,
-            )
-            .exclude(
-                email="",
-            )
-        )
-
-        for candidate in users:
+        for candidate in User.objects.filter(is_active=True):
             if candidate.is_superuser:
                 approvers.append(candidate)
                 continue
@@ -98,12 +85,13 @@ class ApprovalWorkflow:
         title="Approval Required",
     ):
         """
-        Email eligible approvers using the existing notification helper.
-
-        Notification failures must not interrupt approval creation
-        or the result of an already-executed action.
+        Email only approvers with an email address.
+        Notification failures must not interrupt the approval workflow.
         """
         for approver in cls._get_approver_users():
+            if not approver.email:
+                continue
+
             try:
                 create_approval_pending_notification(
                     user=approver,
@@ -113,8 +101,6 @@ class ApprovalWorkflow:
                     title=title,
                 )
             except Exception:
-                # Do not fail the approval workflow because a notification
-                # could not be delivered.
                 continue
 
     def create_action_preview(
