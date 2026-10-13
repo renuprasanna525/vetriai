@@ -4002,25 +4002,6 @@ class AIOrchestrator:
                     "data": {},
                 }
 
-            allowed = self.check_agent_permission(
-                user=user,
-                agent_name="Sales Agent",
-                agent=sales_agent,
-                agent_request=email_request,
-            )
-
-            if not allowed:
-                return {
-                    "status": "error",
-                    "intent": "Email Approval",
-                    "agent": "Sales Agent",
-                    "response": (
-                        "You do not have permission to request "
-                        "this email action. No email has been sent."
-                    ),
-                    "data": {},
-                }
-
             tool_registry = ToolRegistry()
 
             preview = tool_registry.request_action(

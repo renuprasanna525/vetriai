@@ -1,9 +1,8 @@
-﻿from django.test import SimpleTestCase
+﻿from django.test import SimpleTestCase, TestCase
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
 from myapp.models import UserProfile
 from agents.orchestrator import AIOrchestrator
 
@@ -82,17 +81,17 @@ class GreetingResponseTests(SimpleTestCase):
 
 
 class EmailApprovalRoutingTests(TestCase):
-    """Regression tests for explicit email requests."""
+    """Regression tests for explicit employee email approval requests."""
 
     def setUp(self):
         self.user = get_user_model().objects.create_user(
-            username="email_sales_test",
+            username="email_employee_test",
             password="test-password-123",
         )
 
         UserProfile.objects.update_or_create(
             user=self.user,
-            defaults={"role": "sales"},
+            defaults={"role": "employee"},
         )
 
         self.orchestrator = AIOrchestrator()
@@ -105,7 +104,7 @@ class EmailApprovalRoutingTests(TestCase):
 
     @patch("agents.orchestrator.ToolRegistry")
     @patch("agents.orchestrator.create_audit_log")
-    def test_sales_email_request_creates_pending_approval(
+    def test_employee_email_request_creates_pending_approval(
         self,
         mock_audit_log,
         mock_tool_registry_class,
@@ -120,7 +119,6 @@ class EmailApprovalRoutingTests(TestCase):
         with patch.object(
             self.orchestrator,
             "check_agent_permission",
-            return_value=True,
         ) as mock_permission:
             result = self.orchestrator.process_request(
                 request=(
@@ -129,21 +127,18 @@ class EmailApprovalRoutingTests(TestCase):
                     'message: "Test body"'
                 ),
                 user=self.user,
-                role="sales",
+                role="employee",
                 conversation_history=[],
             )
 
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["intent"], "Email Approval")
+        self.assertIn("123", result["response"])
         self.assertIn("not been sent", result["response"].lower())
 
-        mock_permission.assert_called_once()
-
-        permission_kwargs = mock_permission.call_args.kwargs
-        self.assertEqual(
-            permission_kwargs["agent_name"],
-            "Sales Agent",
-        )
+        # Explicit approval requests must not require Sales Agent
+        # data-access permission before creating the approval request.
+        mock_permission.assert_not_called()
 
         mock_tool_registry.request_action.assert_called_once_with(
             agent_name="Sales Agent",
@@ -159,7 +154,7 @@ class EmailApprovalRoutingTests(TestCase):
 
     @patch("agents.orchestrator.ToolRegistry")
     @patch("agents.orchestrator.create_audit_log")
-    def test_prepare_email_for_approval_with_unquoted_fields(
+    def test_employee_can_prepare_email_for_approval_with_unquoted_fields(
         self,
         mock_audit_log,
         mock_tool_registry_class,
@@ -183,18 +178,20 @@ class EmailApprovalRoutingTests(TestCase):
         with patch.object(
             self.orchestrator,
             "check_agent_permission",
-            return_value=True,
-        ):
+        ) as mock_permission:
             result = self.orchestrator.process_request(
                 request=request,
                 user=self.user,
-                role="sales",
+                role="employee",
                 conversation_history=[],
             )
 
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["intent"], "Email Approval")
+        self.assertIn("456", result["response"])
         self.assertIn("not been sent", result["response"].lower())
+
+        mock_permission.assert_not_called()
 
         mock_tool_registry.request_action.assert_called_once_with(
             agent_name="Sales Agent",

@@ -48,6 +48,58 @@ class ApprovalWorkflowPersistenceTests(TestCase):
         # Preview creation must never execute the requested action.
         self.executor.assert_not_called()
 
+    @patch("notifications.utils.WhatsAppService.send_message")
+    @patch("approvals.approval_workflow.create_audit_log")
+    def test_manager_without_email_gets_saved_whatsapp_approval_notification(
+        self,
+        mock_audit,
+        mock_send_message,
+    ):
+        from myapp.models import UserProfile
+        from notifications.models import Notification
+
+        manager = User.objects.create_user(
+            username="approval_whatsapp_manager_test",
+            password="test-password-only",
+        )
+        UserProfile.objects.create(
+            user=manager,
+            role="manager",
+            whatsapp_number="15555550123",
+        )
+
+        mock_send_message.return_value = {
+            "status": "success",
+            "message": "Simulated WhatsApp notification",
+        }
+
+        preview = self.workflow.create_action_preview(
+            agent_name="Sales Agent",
+            tool_name="email_tool",
+            action="send_email",
+            parameters={
+                "recipient": "test@example.com",
+                "subject": "Approval notification test",
+                "message": "Test only; do not send.",
+            },
+            user=self.user,
+        )
+
+        self.assertEqual(preview["status"], "pending")
+
+        notification = Notification.objects.filter(
+            user=manager,
+            notification_type="approval_pending",
+            channel="whatsapp",
+            related_id=str(preview["action_id"]),
+        ).first()
+
+        self.assertIsNotNone(notification)
+        self.assertEqual(notification.title, "Approval Required")
+        self.assertFalse(manager.email)
+
+        mock_send_message.assert_called_once()
+
     @patch("approvals.approval_workflow.create_approval_pending_notification")
     @patch("approvals.approval_workflow.create_audit_log")
     def test_edit_updates_database_parameters(self, mock_audit, mock_notification):
