@@ -4,6 +4,7 @@ import {
     getNotifications,
     markNotificationRead,
     deleteNotification,
+    sendWhatsAppTestNotification,
 } from "../services/notificationService";
 
 
@@ -11,6 +12,8 @@ function Notifications() {
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [whatsappTesting, setWhatsappTesting] = useState(false);
+    const [success, setSuccess] = useState("");
 
     async function loadNotifications() {
         try {
@@ -82,6 +85,26 @@ function Notifications() {
             setError(err.message);
         }
     }
+    async function handleWhatsAppTest() {
+        try {
+            setWhatsappTesting(true);
+            setError("");
+            setSuccess("");
+
+            await sendWhatsAppTestNotification();
+
+            setSuccess(
+                "WhatsApp test notification created. Check the notification list below."
+            );
+
+            await loadNotifications();
+            window.dispatchEvent(new Event("notificationsUpdated"));
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setWhatsappTesting(false);
+        }
+    }
 
     function getPriorityClass(priority) {
         switch (priority) {
@@ -103,24 +126,49 @@ function Notifications() {
         <>
             <div className="container py-4">
 
-                <div className="d-flex justify-content-between align-items-center mb-4">
-                    <h2 className="mb-0">
-                        Notifications
-                    </h2>
+                <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                    <h2 className="mb-0">Notifications</h2>
 
-                    <button
-                        type="button"
-                        className="btn btn-outline-primary"
-                        onClick={loadNotifications}
-                    >
-                        <i className="bi bi-arrow-clockwise me-1"></i>
-                        Refresh
-                    </button>
+                    <div className="d-flex gap-2 flex-wrap">
+                        <button
+                            type="button"
+                            className="btn btn-success"
+                            onClick={handleWhatsAppTest}
+                            disabled={whatsappTesting || loading}
+                        >
+                            {whatsappTesting ? (
+                                <>
+                                    <span className="spinner-border spinner-border-sm me-2" />
+                                    Testing...
+                                </>
+                            ) : (
+                                <>
+                                    <i className="bi bi-whatsapp me-1"></i>
+                                    Send WhatsApp Test
+                                </>
+                            )}
+                        </button>
+
+                        <button
+                            type="button"
+                            className="btn btn-outline-primary"
+                            onClick={loadNotifications}
+                            disabled={loading}
+                        >
+                            <i className="bi bi-arrow-clockwise me-1"></i>
+                            Refresh
+                        </button>
+                    </div>
                 </div>
 
                 {error && (
                     <div className="alert alert-danger">
                         {error}
+                    </div>
+                )}
+                {success && (
+                    <div className="alert alert-success">
+                        {success}
                     </div>
                 )}
 

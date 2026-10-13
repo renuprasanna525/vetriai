@@ -4,6 +4,9 @@ from rest_framework.response import Response
 
 from .models import Notification
 from .serializers import NotificationSerializer
+from rest_framework.views import APIView
+from rest_framework import status
+from .utils import create_notification
 
 
 class NotificationListView(generics.ListAPIView):
@@ -52,3 +55,43 @@ class NotificationMarkReadView(generics.UpdateAPIView):
         serializer = self.get_serializer(notification)
 
         return Response(serializer.data)
+
+
+class WhatsAppTestNotificationView(APIView):
+    """
+    Creates a WhatsApp-channel test notification for the logged-in user.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        profile = getattr(request.user, "profile", None)
+        whatsapp_number = getattr(profile, "whatsapp_number", "")
+
+        if not whatsapp_number:
+            return Response(
+                {
+                    "detail": (
+                        "Configure a WhatsApp number in your profile "
+                        "before testing WhatsApp notifications."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        notification = create_notification(
+            user=request.user,
+            notification_type="whatsapp_test",
+            title="WhatsApp Test Notification",
+            message=(
+                "Test notification from Vetri AI. "
+                "WhatsApp notification workflow verification."
+            ),
+            priority="medium",
+            channel="whatsapp",
+        )
+
+        return Response(
+            NotificationSerializer(notification).data,
+            status=status.HTTP_201_CREATED,
+        )

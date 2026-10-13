@@ -178,12 +178,26 @@ class ApprovalWorkflow:
                 related_id=str(record.pk),
             )
 
-        # Notify active manager/admin approvers by email.
+        # Notify active manager/admin approvers by email and WhatsApp.
+        approvers = self._get_approver_users()
+
         self._notify_approvers_by_email(
             message=message,
             related_id=record.pk,
         )
 
+        for approver in approvers:
+            try:
+                create_approval_pending_notification(
+                    user=approver,
+                    message=message,
+                    related_id=str(record.pk),
+                    channel="whatsapp",
+                    title="Approval Required",
+                )
+            except Exception:
+                # Notification failures must not interrupt approval creation.
+                continue
         return preview
 
     def approve_action(self, action_id, user=None):

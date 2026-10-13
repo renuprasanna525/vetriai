@@ -97,3 +97,25 @@ export async function deleteNotification(notificationId) {
 
     return true;
 }
+
+export async function sendWhatsAppTestNotification() {
+    const response = await authFetch(
+        `${NOTIFICATIONS_URL}/whatsapp-test/`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(
+            data.detail || "Failed to create WhatsApp test notification"
+        );
+    }
+
+    return data;
+}

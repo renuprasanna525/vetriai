@@ -4,6 +4,7 @@ from .views import (
     NotificationListView,
     NotificationDetailView,
     NotificationMarkReadView,
+    WhatsAppTestNotificationView,
 )
 
 urlpatterns = [
@@ -21,5 +22,10 @@ urlpatterns = [
         "<int:pk>/read/",
         NotificationMarkReadView.as_view(),
         name="notification-mark-read",
+    ),
+    path(
+        "whatsapp-test/",
+        WhatsAppTestNotificationView.as_view(),
+        name="whatsapp-test-notification",
     ),
 ]
