@@ -3920,36 +3920,50 @@ class AIOrchestrator:
         email_request = str(request).strip()
 
         if re.match(
-            r"^(?:please\s+)?send\s+(?:an?\s+)?email\b",
+            r"^(?:please\s+)?(?:(?:prepare|draft|create)\s+(?:an?\s+)?email"
+            r"(?:\s+for\s+approval)?|send\s+(?:an?\s+)?email)\b",
             email_request,
             re.IGNORECASE,
         ):
             recipient_match = re.search(
-                r"\bto\s+([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})",
+                r"\b(?:recipient|to)\s*[:=]?\s*"
+                r"([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})",
                 email_request,
                 re.IGNORECASE,
             )
+
             subject_match = re.search(
-                r'\bsubject\s*[:=]?\s*"(.*?)"',
+                r'\bsubject\s*[:=]?\s*(?:"([^"]*)"|([\s\S]*?))'
+                r"(?=\s+\bmessage\s*[:=]|\r?\n|$)",
                 email_request,
-                re.IGNORECASE | re.DOTALL,
+                re.IGNORECASE,
             )
+
             message_match = re.search(
-                r'\bmessage\s*[:=]?\s*"(.*?)"',
+                r'\bmessage\s*[:=]?\s*(?:"(.*?)"|([\s\S]*?))'
+                r"(?=\s+(?:do not send|don\'t send|create a pending approval request)\b|$)",
                 email_request,
-                re.IGNORECASE | re.DOTALL,
+                re.IGNORECASE,
             )
 
             recipient = recipient_match.group(1).strip() if recipient_match else ""
-            subject = subject_match.group(1).strip() if subject_match else ""
-            message = message_match.group(1).strip() if message_match else ""
+            subject = (
+                (subject_match.group(1) or subject_match.group(2) or "").strip()
+                if subject_match
+                else ""
+            )
+            message = (
+                (message_match.group(1) or message_match.group(2) or "").strip()
+                if message_match
+                else ""
+            )
 
             missing_fields = [
                 field
                 for field, value in (
                     ("recipient email address", recipient),
-                    ("quoted email subject", subject),
-                    ("quoted email message", message),
+                    ("email subject", subject),
+                    ("email message", message),
                 )
                 if not value
             ]

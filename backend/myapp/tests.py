@@ -43,9 +43,7 @@ class GreetingResponseTests(SimpleTestCase):
                     "How can I help you today?",
                     result["response"],
                 )
-                self.assertFalse(
-                    result["data"]["conversation_context_used"]
-                )
+                self.assertFalse(result["data"]["conversation_context_used"])
 
     def test_greeting_is_case_insensitive_and_accepts_punctuation(self):
         greetings = ["HELLO", "Hi!", "Hello.", "HEY?", "Good morning!"]
@@ -81,6 +79,7 @@ class GreetingResponseTests(SimpleTestCase):
         )
 
         self.assertFalse(result["data"]["conversation_context_used"])
+
 
 class EmailApprovalRoutingTests(TestCase):
     """Regression tests for explicit email requests."""
@@ -125,7 +124,7 @@ class EmailApprovalRoutingTests(TestCase):
         ) as mock_permission:
             result = self.orchestrator.process_request(
                 request=(
-                    'Send an email to test@example.com '
+                    "Send an email to test@example.com "
                     'subject: "Test subject" '
                     'message: "Test body"'
                 ),
@@ -154,6 +153,57 @@ class EmailApprovalRoutingTests(TestCase):
                 "recipient": "test@example.com",
                 "subject": "Test subject",
                 "message": "Test body",
+            },
+            user=self.user,
+        )
+
+    @patch("agents.orchestrator.ToolRegistry")
+    @patch("agents.orchestrator.create_audit_log")
+    def test_prepare_email_for_approval_with_unquoted_fields(
+        self,
+        mock_audit_log,
+        mock_tool_registry_class,
+    ):
+        mock_tool_registry = mock_tool_registry_class.return_value
+        mock_tool_registry.request_action.return_value = {
+            "status": "pending",
+            "action_id": 456,
+            "message": "Approval created",
+        }
+
+        request = (
+            "Please prepare an email for approval. "
+            "Recipient: test@example.com "
+            "Subject: Vetri AI Approval Workflow Test "
+            "Message: This is a controlled test. "
+            "Do not send the email now. "
+            "Create a pending approval request for manager/admin review only."
+        )
+
+        with patch.object(
+            self.orchestrator,
+            "check_agent_permission",
+            return_value=True,
+        ):
+            result = self.orchestrator.process_request(
+                request=request,
+                user=self.user,
+                role="sales",
+                conversation_history=[],
+            )
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["intent"], "Email Approval")
+        self.assertIn("not been sent", result["response"].lower())
+
+        mock_tool_registry.request_action.assert_called_once_with(
+            agent_name="Sales Agent",
+            tool_name="email_tool",
+            action="send_email",
+            parameters={
+                "recipient": "test@example.com",
+                "subject": "Vetri AI Approval Workflow Test",
+                "message": "This is a controlled test.",
             },
             user=self.user,
         )
