@@ -1686,3 +1686,24 @@ select {
     opacity: 1;
   }
 }
+
+.notification-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.notification-actions button {
+  margin: 0;
+}
+
+@media (max-width: 576px) {
+  .notification-actions {
+    width: 100%;
+  }
+
+  .notification-actions button {
+    flex: 1;
+  }
+}
