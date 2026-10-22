@@ -55,8 +55,8 @@ class ApprovalWorkflow:
     def _get_approver_users(cls):
         """
         Return active manager/admin users, including superusers.
-        Email addresses are not required for in-app or simulated
-        WhatsApp notifications.
+        Return active manager/admin approvers. Email addresses are
+        checked separately before sending email notifications.
         """
         User = get_user_model()
         approvers = []
@@ -163,27 +163,12 @@ class ApprovalWorkflow:
                 ),
                 related_id=str(record.pk),
             )
-
-        # Notify active manager/admin approvers by email and WhatsApp.
-        approvers = self._get_approver_users()
-
+        # Notify active manager/admin approvers by email.
         self._notify_approvers_by_email(
             message=message,
             related_id=record.pk,
         )
 
-        for approver in approvers:
-            try:
-                create_approval_pending_notification(
-                    user=approver,
-                    message=message,
-                    related_id=str(record.pk),
-                    channel="whatsapp",
-                    title="Approval Required",
-                )
-            except Exception:
-                # Notification failures must not interrupt approval creation.
-                continue
         return preview
 
     def approve_action(self, action_id, user=None):

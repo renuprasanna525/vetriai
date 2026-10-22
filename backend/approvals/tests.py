@@ -48,18 +48,18 @@ class ApprovalWorkflowPersistenceTests(TestCase):
         # Preview creation must never execute the requested action.
         self.executor.assert_not_called()
 
-    @patch("notifications.utils.WhatsAppService.send_message")
+    @patch("approvals.approval_workflow.create_approval_pending_notification")
     @patch("approvals.approval_workflow.create_audit_log")
-    def test_manager_without_email_gets_saved_whatsapp_approval_notification(
+    def test_manager_without_email_does_not_get_whatsapp_notification(
         self,
         mock_audit,
-        mock_send_message,
+        mock_notification,
     ):
         from myapp.models import UserProfile
         from notifications.models import Notification
 
         manager = User.objects.create_user(
-            username="approval_whatsapp_manager_test",
+            username="approval_no_email_manager_test",
             password="test-password-only",
         )
         UserProfile.objects.create(
@@ -67,11 +67,6 @@ class ApprovalWorkflowPersistenceTests(TestCase):
             role="manager",
             whatsapp_number="15555550123",
         )
-
-        mock_send_message.return_value = {
-            "status": "success",
-            "message": "Simulated WhatsApp notification",
-        }
 
         preview = self.workflow.create_action_preview(
             agent_name="Sales Agent",
@@ -87,18 +82,21 @@ class ApprovalWorkflowPersistenceTests(TestCase):
 
         self.assertEqual(preview["status"], "pending")
 
-        notification = Notification.objects.filter(
+        whatsapp_notifications = Notification.objects.filter(
             user=manager,
             notification_type="approval_pending",
             channel="whatsapp",
             related_id=str(preview["action_id"]),
-        ).first()
+        )
+        self.assertFalse(whatsapp_notifications.exists())
 
-        self.assertIsNotNone(notification)
-        self.assertEqual(notification.title, "Approval Required")
-        self.assertFalse(manager.email)
-
-        mock_send_message.assert_called_once()
+        # The manager has no email, so no email notification is attempted.
+        manager_calls = [
+            call
+            for call in mock_notification.call_args_list
+            if call.kwargs.get("user") == manager
+        ]
+        self.assertFalse(manager_calls)
 
     @patch("approvals.approval_workflow.create_approval_pending_notification")
     @patch("approvals.approval_workflow.create_audit_log")
