@@ -98,6 +98,13 @@ class AgentRegistry:
             "financial",
             "expense",
             "expenses",
+            "spend",
+            "spent",
+            "spending",
+            "balance",
+            "remaining balance",
+            "left in my account",
+            "income",
             "profit",
             "financial summary",
             "revenue",
@@ -106,6 +113,26 @@ class AgentRegistry:
             "my financial data",
             "my personal finance",
             "personal finance summary",
+            "transaction",
+            "transactions",
+            "bill",
+            "bills",
+            "overdue bill",
+            "due bills",
+            "budget",
+            "budgets",
+            "budget usage",
+            "budget limit",
+            "account",
+            "accounts",
+            "bank balance",
+            "account balance",
+            "top spending",
+            "top spendings",
+            "spending breakdown",
+            "spending category",
+            "spending categories",
+            "finance insights",
         ]
 
         sales_context_keywords = [
@@ -588,6 +615,13 @@ class AgentRegistry:
             "financial",
             "expense",
             "expenses",
+            "spend",
+            "spent",
+            "spending",
+            "balance",
+            "remaining balance",
+            "left in my account",
+            "income",
             "profit",
             "financial summary",
             # Payment-related finance requests
@@ -605,6 +639,26 @@ class AgentRegistry:
             "my financial data",
             "my personal finance",
             "personal finance summary",
+            "transaction",
+            "transactions",
+            "bill",
+            "bills",
+            "overdue bill",
+            "due bills",
+            "budget",
+            "budgets",
+            "budget usage",
+            "budget limit",
+            "account",
+            "accounts",
+            "bank balance",
+            "account balance",
+            "top spending",
+            "top spendings",
+            "spending breakdown",
+            "spending category",
+            "spending categories",
+            "finance insights",
         ]
 
         finance_score = sum(
@@ -644,10 +698,32 @@ class AgentRegistry:
             1 for keyword in reporting_keywords if keyword in request_lower
         )
 
-        # Reporting is a complete business-level request.
-        # Do not add GitHub merely because the report contains
-        # GitHub-related wording.
-        if reporting_score > 0:
+        # Personal FinTrack reports belong to Finance Agent.
+        fintrack_report_terms = [
+            "fintrack",
+            "my finance data",
+            "my financial data",
+            "my personal finance",
+            "personal finance summary",
+            "spending breakdown",
+            "spending category",
+            "spending categories",
+            "top spending",
+            "top spendings",
+            "finance insights",
+        ]
+
+        is_fintrack_report = any(
+            term in request_lower for term in fintrack_report_terms
+        )
+        if is_fintrack_report:
+            for agent in self.agents:
+                if agent.name == "Finance Agent":
+                    print("FINTRACK PRIORITY:", agent.name)
+                    return [agent]
+
+        # Generic business reports belong to Reporting Agent.
+        if reporting_score > 0 and not is_fintrack_report:
             for agent in self.agents:
                 if agent.name == "Reporting Agent":
                     print(

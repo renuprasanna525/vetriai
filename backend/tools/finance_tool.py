@@ -6,16 +6,24 @@ import requests
 
 class FinanceTool:
     """
-    Controlled tool for finance-related operations.
+    Controlled tool for company finance and FinTrack information.
     """
 
     name = "finance_tool"
     description = "Provides controlled finance information."
 
+    FINTRACK_ACTIONS = {
+        "get_fintrack_transactions": "transactions/",
+        "get_fintrack_bills": "bills/",
+        "get_fintrack_budgets": "budgets/",
+        "get_fintrack_accounts": "accounts/",
+        "get_fintrack_reports": "reports/",
+    }
+
     def execute(self, action, user=None):
 
+        # Preserve Vetri's existing company finance summary.
         if action == "get_finance_summary":
-            # Preserve Vetri's existing company-finance summary.
             return {
                 "status": "success",
                 "data": {
@@ -25,64 +33,45 @@ class FinanceTool:
                 },
             }
 
+        # FinTrack summary.
         if action == "get_fintrack_summary":
-            api_url = os.getenv(
-                "FINTRACK_API_URL",
-                "https://finance-xnjh.onrender.com/api/finance/summary/",
-            ).strip()
-            api_key = os.getenv("FINTRACK_API_KEY", "").strip()
+            result = self._get_fintrack_endpoint("summary/")
 
-            if not api_key:
+            if result.get("status") != "success":
+                return result
+
+            data = result["data"]
+            required_fields = (
+                "currency",
+                "total_income",
+                "total_expenses",
+                "net_balance",
+            )
+
+            if not all(field in data for field in required_fields):
                 return {
                     "status": "error",
-                    "message": "FinTrack API authentication is not configured.",
+                    "message": "FinTrack returned an incomplete finance summary.",
                 }
 
-            try:
-                response = requests.get(
-                    api_url,
-                    headers={"Authorization": f"Bearer {api_key}"},
-                    timeout=15,
-                )
-                response.raise_for_status()
-                result = response.json()
+            return {
+                "status": "success",
+                "source": "FinTrack",
+                "data": {
+                    "currency": data["currency"],
+                    "total_income": data["total_income"],
+                    "total_expenses": data["total_expenses"],
+                    "net_balance": data["net_balance"],
+                    "scope": data.get("scope", "all_time"),
+                },
+            }
 
-                required_fields = (
-                    "currency",
-                    "total_income",
-                    "total_expenses",
-                    "net_balance",
-                )
-                if not all(field in result for field in required_fields):
-                    return {
-                        "status": "error",
-                        "message": "FinTrack returned an incomplete finance summary.",
-                    }
+        # FinTrack transactions, bills, budgets, accounts and reports.
+        if action in self.FINTRACK_ACTIONS:
+            endpoint = self.FINTRACK_ACTIONS[action]
+            return self._get_fintrack_endpoint(endpoint)
 
-                return {
-                    "status": "success",
-                    "source": "FinTrack",
-                    "data": {
-                        "currency": result["currency"],
-                        "total_income": result["total_income"],
-                        "total_expenses": result["total_expenses"],
-                        "net_balance": result["net_balance"],
-                        "scope": result.get("scope", "all_time"),
-                    },
-                }
-
-            except requests.RequestException:
-                return {
-                    "status": "error",
-                    "message": "Unable to retrieve finance data from FinTrack.",
-                }
-            except (ValueError, TypeError):
-                return {
-                    "status": "error",
-                    "message": "FinTrack returned an invalid finance response.",
-                }
-
-        # Payments Due Today
+        # Existing company payments-due-today logic.
         if action == "get_payments_due_today":
             today = date.today()
 
@@ -133,3 +122,62 @@ class FinanceTool:
             "status": "error",
             "message": "Finance action not supported.",
         }
+
+    def _get_fintrack_endpoint(self, endpoint):
+        api_url = os.getenv(
+            "FINTRACK_API_URL",
+            "https://finance-xnjh.onrender.com/api/finance/summary/",
+        ).strip()
+        api_key = os.getenv("FINTRACK_API_KEY", "").strip()
+
+        if not api_key:
+            return {
+                "status": "error",
+                "message": "FinTrack API authentication is not configured.",
+            }
+
+        # FINTRACK_API_URL currently points to the summary endpoint.
+        if endpoint == "summary/":
+            url = api_url
+        else:
+            base_url = api_url.rsplit("summary/", 1)[0]
+
+            if base_url == api_url:
+                return {
+                    "status": "error",
+                    "message": "FinTrack API URL must point to the summary endpoint.",
+                }
+
+            url = f"{base_url}{endpoint}"
+
+        try:
+            response = requests.get(
+                url,
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=15,
+            )
+            response.raise_for_status()
+            result = response.json()
+
+            if not isinstance(result, dict):
+                return {
+                    "status": "error",
+                    "message": "FinTrack returned an invalid response format.",
+                }
+
+            return {
+                "status": "success",
+                "source": "FinTrack",
+                "data": result,
+            }
+
+        except requests.RequestException:
+            return {
+                "status": "error",
+                "message": "Unable to retrieve finance data from FinTrack.",
+            }
+        except (ValueError, TypeError):
+            return {
+                "status": "error",
+                "message": "FinTrack returned an invalid response.",
+            }
