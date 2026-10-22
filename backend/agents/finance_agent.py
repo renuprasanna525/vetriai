@@ -236,7 +236,6 @@ class FinanceAgent(BaseAgent):
                     "accounts",
                     "bank balance",
                     "account balance",
-                    "remaining balance",
                     "left in my account",
                 ],
             ),
@@ -254,6 +253,7 @@ class FinanceAgent(BaseAgent):
             "my personal finance",
             "personal finance summary",
             "my financial summary",
+            "remaining balance",
         ]
 
         if any(keyword in request_lower for keyword in fintrack_summary_keywords):

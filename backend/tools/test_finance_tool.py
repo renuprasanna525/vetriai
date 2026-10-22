@@ -57,6 +57,30 @@ class FinanceAgentFinTrackRoutingTests(SimpleTestCase):
                 )
                 self.assertEqual(result["source"], "FinTrack")
 
+    def test_remaining_balance_uses_fintrack_summary(self):
+        with patch.object(
+            self.agent.finance_tool,
+            "execute",
+            return_value={
+                "status": "success",
+                "data": {
+                    "currency": "INR",
+                    "total_income": "45800.00",
+                    "total_expenses": "1218.00",
+                    "net_balance": "44582.00",
+                },
+            },
+        ) as mock_execute:
+            result = self.agent.process(
+                "What is my remaining balance?",
+                user=None,
+            )
+
+        mock_execute.assert_called_once_with("get_fintrack_summary", None)
+        self.assertEqual(result["status"], "success")
+        self.assertIn("Net Balance", result["message"])
+        self.assertIn("44582.00", result["message"])
+
     def test_fintrack_api_failure_is_not_reported_as_success(self):
         with patch.object(
             self.agent.finance_tool,
