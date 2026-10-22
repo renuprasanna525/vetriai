@@ -101,6 +101,11 @@ class AgentRegistry:
             "profit",
             "financial summary",
             "revenue",
+            "fintrack",
+            "my finance data",
+            "my financial data",
+            "my personal finance",
+            "personal finance summary",
         ]
 
         sales_context_keywords = [
@@ -594,6 +599,12 @@ class AgentRegistry:
             "due payments",
             "due today",
             "payments due today",
+            # FinTrack integration
+            "fintrack",
+            "my finance data",
+            "my financial data",
+            "my personal finance",
+            "personal finance summary",
         ]
 
         finance_score = sum(

@@ -39,6 +39,53 @@ class FinanceAgent(BaseAgent):
     def process(self, request, user, credentials=None):
 
         request_lower = request.lower()
+        # -----------------------------------------
+        # Explicit FinTrack Summary
+        # -----------------------------------------
+        fintrack_keywords = [
+            "fintrack",
+            "my finance data",
+            "my financial data",
+            "my personal finance",
+            "personal finance summary",
+        ]
+
+        if any(keyword in request_lower for keyword in fintrack_keywords):
+            result = self.finance_tool.execute(
+                "get_fintrack_summary",
+                user,
+            )
+
+            if result.get("status") == "success":
+                data = result.get("data", {})
+
+                message = (
+                    "FinTrack Financial Summary:\n"
+                    f"Total Income: {data.get('currency', 'INR')} "
+                    f"{data.get('total_income', 0)}\n"
+                    f"Total Expenses: {data.get('currency', 'INR')} "
+                    f"{data.get('total_expenses', 0)}\n"
+                    f"Net Balance: {data.get('currency', 'INR')} "
+                    f"{data.get('net_balance', 0)}"
+                )
+
+                return {
+                    "agent": self.name,
+                    "status": "success",
+                    "source": "FinTrack",
+                    "data": data,
+                    "message": message,
+                }
+
+            return {
+                "agent": self.name,
+                "status": result.get("status", "error"),
+                "data": {},
+                "message": result.get(
+                    "message",
+                    "Unable to retrieve FinTrack financial data.",
+                ),
+            }
 
         # -----------------------------------------
         # Payments Due Today
