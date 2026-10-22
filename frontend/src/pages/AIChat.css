@@ -1133,7 +1133,16 @@
     }
 
     .ai-chat-header-icon {
-        display: none;
+        display: flex;
+        flex-shrink: 0;
+        width: 36px;
+        height: 36px;
+        align-items: center;
+        justify-content: center;
+        color: #667085;
+        font-size: 18px;
+        cursor: pointer;
+        touch-action: manipulation;
     }
 
     .ai-new-chat-button {
