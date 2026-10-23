@@ -171,12 +171,47 @@ class FinanceTool:
                 "data": result,
             }
 
-        except requests.RequestException:
+        except requests.Timeout:
+            print(f"FinTrack timeout: endpoint={endpoint}, timeout=15s")
             return {
                 "status": "error",
                 "message": "Unable to retrieve finance data from FinTrack.",
             }
+
+        except requests.HTTPError as exc:
+            status_code = (
+                exc.response.status_code
+                if exc.response is not None
+                else "unknown"
+            )
+            print(
+                f"FinTrack HTTP error: endpoint={endpoint}, "
+                f"status={status_code}"
+            )
+            return {
+                "status": "error",
+                "message": "Unable to retrieve finance data from FinTrack.",
+            }
+
+        except requests.ConnectionError:
+            print(f"FinTrack connection error: endpoint={endpoint}")
+            return {
+                "status": "error",
+                "message": "Unable to retrieve finance data from FinTrack.",
+            }
+
+        except requests.RequestException as exc:
+            print(
+                f"FinTrack request error: endpoint={endpoint}, "
+                f"type={type(exc).__name__}"
+            )
+            return {
+                "status": "error",
+                "message": "Unable to retrieve finance data from FinTrack.",
+            }
+
         except (ValueError, TypeError):
+            print(f"FinTrack response parsing error: endpoint={endpoint}")
             return {
                 "status": "error",
                 "message": "FinTrack returned an invalid response.",
