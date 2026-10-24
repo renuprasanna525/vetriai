@@ -286,7 +286,6 @@ class AIOrchestrator:
             "about it",
             "about that",
             "about this",
-            "its",
             "their",
             "the same",
             "same project",
@@ -1619,6 +1618,21 @@ class AIOrchestrator:
         Entity context is included when a specific business
         item/project/customer/employee is known.
         """
+        # Preserve explicit finance data requests instead of
+        # replacing them with a generic contextual finance summary.
+        if agent_name == "Finance Agent":
+            request_lower = request.lower()
+
+            explicit_finance_topics = (
+                "budget",
+                "bill",
+                "transaction",
+                "account",
+                "report",
+            )
+
+            if any(topic in request_lower for topic in explicit_finance_topics):
+                return request
 
         entity_context = entity_context or []
 

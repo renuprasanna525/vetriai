@@ -69,6 +69,13 @@ class FinanceAgent(BaseAgent):
 
         data = result.get("data", {})
         lines = [title]
+        if action == "get_fintrack_budgets":
+            lines.append(
+                "Currency: INR (Indian Rupees, ₹). "
+                "All budget amounts (spent, limit, and remaining) "
+                "are in INR. Always display these amounts using ₹, "
+                "never $ or USD."
+            )
 
         list_labels = {
             "transactions": (
